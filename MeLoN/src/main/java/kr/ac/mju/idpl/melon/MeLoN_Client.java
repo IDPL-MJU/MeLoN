@@ -184,10 +184,10 @@ public class MeLoN_Client {
 		yarnClient.init(yarnConf);
 
 		String amMemoryString = melonConf.get(MeLoN_ConfigurationKeys.AM_MEMORY,
-				MeLoN_ConfigurationKeys.DEFAULT_AM_MEMORY);
+				MeLoN_ConfigurationKeys.AM_MEMORY_DEFAULT);
 		amMemory = Integer.parseInt(Utils.parseMemoryString(amMemoryString));
-		amVCores = melonConf.getInt(MeLoN_ConfigurationKeys.AM_VCORES, MeLoN_ConfigurationKeys.DEFAULT_AM_VCORES);
-		amGpus = melonConf.getInt(MeLoN_ConfigurationKeys.AM_GPUS, MeLoN_ConfigurationKeys.DEFAULT_AM_GPUS);
+		amVCores = melonConf.getInt(MeLoN_ConfigurationKeys.AM_VCORES, MeLoN_ConfigurationKeys.AM_VCORES_DEFAULT);
+		amGpus = melonConf.getInt(MeLoN_ConfigurationKeys.AM_GPUS, MeLoN_ConfigurationKeys.AM_GPUS_DEFAULT);
 
 		pythonBinaryPath = cliParser.getOptionValue("python_binary_path");
 		pythonVenv = cliParser.getOptionValue("python_venv");
@@ -423,13 +423,12 @@ public class MeLoN_Client {
 			}
 			exitCode = client.run();
 		} catch (Throwable t) {
-			exitCode = -1;
 			LOG.error("Failed to finish MeLoN_Client seccessfully.");
+			exitCode = -1;
 		}
 		if(exitCode == 0) {
 			LOG.info("Application submitted successfully.");
 		}
-
 		System.exit(exitCode);
 
 	}

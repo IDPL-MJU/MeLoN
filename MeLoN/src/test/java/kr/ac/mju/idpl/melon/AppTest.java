@@ -1,4 +1,4 @@
-package kr.ac.mju.idpl.MeLoN;
+package kr.ac.mju.idpl.melon;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
