@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.commons.cli.CommandLine;
@@ -23,7 +24,10 @@ import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
+import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.NodeReport;
+import org.apache.hadoop.yarn.api.records.Priority;
+import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.hadoop.yarn.client.api.AMRMClient;
 import org.apache.hadoop.yarn.client.api.AMRMClient.ContainerRequest;
 import org.apache.hadoop.yarn.client.api.async.AMRMClientAsync;
@@ -47,29 +51,32 @@ public class MeLoN_ApplicationMaster {
 
 	// private ApplicationAttemptId appAttemptID;
 
-	private String appMasterHostname = "";
-	private int appMasterHostPort = 0;
-	private String appMasterTrackingUrl = "";
+	private String amHostname = "";
+	private int amHostPort = 0;
+	private String amTrackingUrl = "";
 
+	private MeLoN_AppSession appSession;
 	private int numTotalContainers;
 	private int containerMemory;
 	private int requestPriority;
 
+	private Map<String, List<ContainerRequest>> askedjobTypeMap = new HashMap<>();
+
 	private ContainerId containerId;
 	private String appIdString;
 	private Configuration melonConf = new Configuration(false);
+	private Map<String, LocalResource> localResources = new ConcurrentHashMap<>();
 	private String hdfsClasspath;
 	private String adminUser;
 	private String adminPassword;
-	
 
 	private AtomicInteger numCompletedContainers = new AtomicInteger();
 	private AtomicInteger numAllocatedContainers = new AtomicInteger();
 	private AtomicInteger numFailedContainers = new AtomicInteger();
 	private AtomicInteger numRequestedContainers = new AtomicInteger();
 
-	private Map<String, String> shellEnv = new HashMap<>();
-	private Map<String, String> containerEnv = new HashMap<>();
+	private Map<String, String> shellEnvs = new HashMap<>();
+	private Map<String, String> containerEnvs = new HashMap<>();
 	private String melonHome;
 	private String appJar;
 	private String domainController;
@@ -104,10 +111,10 @@ public class MeLoN_ApplicationMaster {
 		}
 		melonConf.addResource(new Path(MeLoN_Constants.MELON_FINAL_XML));
 		Map<String, String> envs = System.getenv();
-		String[] shellEnvs = melonConf.getStrings(MeLoN_ConfigurationKeys.SHELL_ENVS);
-		shellEnv = Utils.parseKeyValue(shellEnvs);
-		String[] containersEnvs = melonConf.getStrings(MeLoN_ConfigurationKeys.CONTAINER_ENVS);
-		containerEnv = Utils.parseKeyValue(containersEnvs);
+		String[] shellEnvsStr = melonConf.getStrings(MeLoN_ConfigurationKeys.SHELL_ENVS);
+		shellEnvs = Utils.parseKeyValue(shellEnvsStr);
+		String[] containersEnvsStr = melonConf.getStrings(MeLoN_ConfigurationKeys.CONTAINER_ENVS);
+		containerEnvs = Utils.parseKeyValue(containersEnvsStr);
 
 		containerId = ContainerId.fromString(envs.get(ApplicationConstants.Environment.CONTAINER_ID.name()));
 		appIdString = containerId.getApplicationAttemptId().getApplicationId().toString();
@@ -131,9 +138,12 @@ public class MeLoN_ApplicationMaster {
 		amRMClient.init(yarnConf);
 		amRMClient.start();
 		LOG.info("Starting amRMClient...");
-		
-		String amHostname = NetUtils.getHostname();
-		RegisterApplicationMasterResponse response = amRMClient.registerApplicationMaster(amHostname, -1, "");
+
+		amHostname = NetUtils.getHostname();
+		amHostPort = 0;
+		String amIPPort = NetUtils.getLocalInetAddress(amHostname).getHostAddress() + ":" + amHostPort;
+		RegisterApplicationMasterResponse response = amRMClient.registerApplicationMaster(amHostname, amHostPort,
+				amTrackingUrl);
 		LOG.info("MeLoN_ApplicationMaster is registered with response : {}", response.toString());
 
 		NMCallbackHandler containerListener = new NMCallbackHandler();
@@ -141,11 +151,43 @@ public class MeLoN_ApplicationMaster {
 		nmClientAsync.init(yarnConf);
 		nmClientAsync.start();
 		LOG.info("Starting NMCallbackHandler...");
-		
-		
-		
-		
+
+		appSession = buildAppSession();
+		appSession.setResources(yarnConf, hdfsConf, localResources, containerEnvs, hdfsClasspath);
+		List<MeLoN_ContainerRequest> requests = appSession.getContainerRequests();
+		for (MeLoN_ContainerRequest request : requests) {
+			ContainerRequest containerAsk = setupContainerAskForRM(request);
+			if (!askedjobTypeMap.containsKey(request.getJobName())) {
+				askedjobTypeMap.put(request.getJobName(), new ArrayList<>());
+			}
+			askedjobTypeMap.get(request.getJobName()).add(containerAsk);
+			amRMClient.addContainerRequest(containerAsk);
+		}
+		while (!done) {
+			try {
+				Thread.sleep(200);
+			} catch (InterruptedException e) {
+
+			}
+		}
+
 		return true;
+	}
+
+	private ContainerRequest setupContainerAskForRM(MeLoN_ContainerRequest request) {
+		Priority priority = Priority.newInstance(request.getPriority());
+		Resource capability = Resource.newInstance((int) request.getMemory(), request.getvCores());
+		Utils.setCapabilityGPU(capability, request.getGpus());
+		ContainerRequest containerAsk = new ContainerRequest(capability, null, null, priority);
+		LOG.info("Requested container ask: " + containerAsk.toString());
+		return containerAsk;
+	}
+
+	private MeLoN_AppSession buildAppSession() {
+		MeLoN_AppSession.Builder builder = new MeLoN_AppSession.Builder().setMelonConf(melonConf)
+				.setTaskExecutorJVMArgs(melonConf.get(MeLoN_ConfigurationKeys.TASK_EXECUTOR_JVM_OPTS,
+						MeLoN_ConfigurationKeys.TASK_EXECUTOR_JVM_OPTS_DEFAULT));
+		return builder.build();
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -160,7 +202,6 @@ public class MeLoN_ApplicationMaster {
 			System.exit(-1);
 		}
 	}
-
 
 	private class NMCallbackHandler implements NMClientAsync.CallbackHandler {
 
@@ -206,15 +247,33 @@ public class MeLoN_ApplicationMaster {
 		}
 
 		@Override
-		public void onContainersAllocated(List<Container> arg0) {
-			// TODO Auto-generated method stub
-
+		public void onContainersAllocated(List<Container> containers) {
+			LOG.info("Allocated: " + containers.size() + " containers.");
+			for (Container container : containers) {
+				LOG.info("Launching a task in container" 
+						+ ", containerId = " + container.getId() 
+						+ ", containerNode = " + container.getNodeId().getHost() + ":" + container.getNodeId().getPort()
+						+ ", resourceRequest = " + container.getResource() 
+						+ ", priority = " + container.getPriority());
+				Thread thread = new Thread(new ContainerLauncher(container));
+				thread.start();
+			}
 		}
 
 		@Override
-		public void onContainersCompleted(List<ContainerStatus> arg0) {
-			// TODO Auto-generated method stub
-
+		public void onContainersCompleted(List<ContainerStatus> completedContainers) {
+			LOG.info("Completed containers: " + completedContainers.size());
+			for (ContainerStatus containerStatus : completedContainers) {
+				int exitStatus = containerStatus.getExitStatus();
+				LOG.info("ContainerID = " + containerStatus.getContainerId() + ", state = " + containerStatus.getState()
+						+ ", exitStatus = " + exitStatus);
+				String diagnotics = containerStatus.getDiagnostics();
+				if (ContainerExitStatus.SUCCESS != exitStatus) {
+					LOG.error(diagnotics);
+				} else {
+					LOG.info(diagnotics);
+				}
+			}
 		}
 
 		@Override
@@ -235,5 +294,18 @@ public class MeLoN_ApplicationMaster {
 
 		}
 
+	}
+
+	private class ContainerLauncher implements Runnable {
+		Container container;
+		//NMCallbackHandler containerListener;
+
+		public ContainerLauncher(Container container) {
+			this.container = container;
+		}
+
+		public void run() {
+
+		}
 	}
 }
