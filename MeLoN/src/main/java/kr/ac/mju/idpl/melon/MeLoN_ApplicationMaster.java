@@ -1,8 +1,10 @@
 package kr.ac.mju.idpl.melon;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +17,7 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.math3.analysis.function.Constant;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
@@ -23,6 +26,7 @@ import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.ContainerLaunchContext;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.LocalResource;
 import org.apache.hadoop.yarn.api.records.NodeReport;
@@ -35,15 +39,19 @@ import org.apache.hadoop.yarn.client.api.async.NMClientAsync;
 import org.apache.hadoop.yarn.client.api.async.impl.NMClientAsyncImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnException;
+import org.apache.hadoop.yarn.util.Records;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import kr.ac.mju.idpl.melon.MeLoN_AppSession.MeLoN_Task;
 import kr.ac.mju.idpl.melon.util.Utils;
 
 public class MeLoN_ApplicationMaster {
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_ApplicationMaster.class);
 	private Configuration yarnConf;
 	private Configuration hdfsConf;
+
+	private FileSystem resourceFs;
 
 	private AMRMClientAsync<ContainerRequest> amRMClient;
 	private NMClientAsync nmClientAsync;
@@ -61,6 +69,7 @@ public class MeLoN_ApplicationMaster {
 	private int requestPriority;
 
 	private Map<String, List<ContainerRequest>> askedjobTypeMap = new HashMap<>();
+	private Map<Integer, List<Container>> appSessionContainersMap = new ConcurrentHashMap<>();
 
 	private ContainerId containerId;
 	private String appIdString;
@@ -250,11 +259,9 @@ public class MeLoN_ApplicationMaster {
 		public void onContainersAllocated(List<Container> containers) {
 			LOG.info("Allocated: " + containers.size() + " containers.");
 			for (Container container : containers) {
-				LOG.info("Launching a task in container" 
-						+ ", containerId = " + container.getId() 
-						+ ", containerNode = " + container.getNodeId().getHost() + ":" + container.getNodeId().getPort()
-						+ ", resourceRequest = " + container.getResource() 
-						+ ", priority = " + container.getPriority());
+				LOG.info("Launching a task in container" + ", containerId = " + container.getId() + ", containerNode = "
+						+ container.getNodeId().getHost() + ":" + container.getNodeId().getPort()
+						+ ", resourceRequest = " + container.getResource() + ", priority = " + container.getPriority());
 				Thread thread = new Thread(new ContainerLauncher(container));
 				thread.start();
 			}
@@ -277,9 +284,10 @@ public class MeLoN_ApplicationMaster {
 		}
 
 		@Override
-		public void onError(Throwable arg0) {
-			// TODO Auto-generated method stub
-
+		public void onError(Throwable throwable) {
+			LOG.error("Received error in AM to RM call", throwable);
+			done = true;
+			amRMClient.stop();
 		}
 
 		@Override
@@ -290,21 +298,69 @@ public class MeLoN_ApplicationMaster {
 
 		@Override
 		public void onShutdownRequest() {
-			// TODO Auto-generated method stub
-
+			LOG.info("onShutdownRequest called in RMCallbackHandler");
 		}
 
 	}
 
 	private class ContainerLauncher implements Runnable {
 		Container container;
-		//NMCallbackHandler containerListener;
+		// NMCallbackHandler containerListener;
 
 		public ContainerLauncher(Container container) {
 			this.container = container;
 		}
 
 		public void run() {
+			MeLoN_Task task = appSession.getAndInitMatchingTaskByPriority(container.getPriority().getPriority());
+			if (task == null) {
+				LOG.error("Task was null. Nothing to schedule.");
+			}
+			task.setContainer(container);
+			task.setStatus(MeLoN_TaskStatus.READY);
+
+			// Add job type specific resources
+			Map<String, LocalResource> containerResources = new ConcurrentHashMap<>(localResources);
+			String[] resources = melonConf.getStrings(MeLoN_ConfigurationKeys.getResourcesKey(task.getJobName()));
+			Utils.addResources(resources, containerResources, resourceFs);
+
+			// All resources available to all containers
+			resources = melonConf.getStrings(MeLoN_ConfigurationKeys.CONTAINER_RESOURCES);
+			Utils.addResources(resources, containerResources, resourceFs);
+
+			task.addContainer(container);
+			LOG.info("Setting Container [" + container.getId() + "] for task [" + task.getId() + "]..");
+
+			Map<String, String> containerLaunchEnvs = new ConcurrentHashMap<>(containerEnvs);
+
+			String jobName = task.getJobName();
+			String taskIndex = task.getTaskIndex();
+			containerLaunchEnvs.put("JOB_NAME", jobName);
+			containerLaunchEnvs.put("TASK_INDEX", taskIndex);
+			containerLaunchEnvs.put("TASK_NUM", String.valueOf(appSession.getTotalTrackedTasks()));
+			containerLaunchEnvs.put("SESSION_ID", String.valueOf(appSession.sessionId));
+
+			List<String> vargs = new ArrayList<>();
+			vargs.add(appSession.getTaskCommand());
+			vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/MeLoN_TaskExecutor.stdout");
+			vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/MeLoN_TaskExecutor.stderr");
+			String command = String.join(" ", vargs);
+			List<String> commands = new ArrayList<String>();
+			commands.add(command);
+			LOG.info("Constructed command " + commands);
+			LOG.info("Container environment: " + containerLaunchEnvs);
+
+			ContainerLaunchContext ctx = Records.newRecord(ContainerLaunchContext.class);
+			ctx.setLocalResources(containerResources);
+			ctx.setEnvironment(containerLaunchEnvs);
+			ctx.setCommands(commands);
+
+			// appSessionContainersMap.computeIfAbsent(appSession.sessionId, key ->
+			// Collections.synchronizedList(new ArrayList<>())).add(container);
+
+			nmClientAsync.startContainerAsync(container, ctx);
+			task.setStatus(MeLoN_TaskStatus.RUNNING);
+			LOG.info("Container {} launched!", container.getId());
 
 		}
 	}

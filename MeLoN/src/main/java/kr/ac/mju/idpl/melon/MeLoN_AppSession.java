@@ -2,8 +2,10 @@ package kr.ac.mju.idpl.melon;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.conf.Configuration;
@@ -20,9 +22,11 @@ import kr.ac.mju.idpl.melon.util.Utils;
 public class MeLoN_AppSession {
 
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_AppSession.class);
+	public int sessionId = 0;
 	private String appId;
 	private String jvmArgs;
 	private Configuration melonConf;
+	private Map<ContainerId, MeLoN_Task> containerIdMap = new HashMap<>();
 	private long startingTime;
 	private long finishingTime;
 
@@ -38,6 +42,12 @@ public class MeLoN_AppSession {
 		}
 	}
 
+	public String getTaskCommand() {
+		StringJoiner cmd = new StringJoiner(" ");
+		cmd.add("$JAVA_HOME/bin/java").add(jvmArgs).add(MeLoN_TaskExecutor.class.getName());
+		return cmd.toString();
+	}
+
 	public List<MeLoN_ContainerRequest> getContainerRequests() {
 		List<MeLoN_ContainerRequest> requests = new ArrayList<>();
 		for (Map.Entry<String, MeLoN_Task[]> entry : jobTasks.entrySet()) {
@@ -49,6 +59,24 @@ public class MeLoN_AppSession {
 			}
 		}
 		return requests;
+	}
+
+	public synchronized MeLoN_Task getAndInitMatchingTaskByPriority(int priority) {
+		for (Map.Entry<String, MeLoN_ContainerRequest> entry : containerRequests.entrySet()) {
+			String jobName = entry.getKey();
+			if (entry.getValue().getPriority() != priority) {
+				LOG.debug("Ignoring jobname {" + jobName + "} as priority doesn't match");
+				continue;
+			}
+			MeLoN_Task[] tasks = jobTasks.get(jobName);
+			for (int i = 0; i < tasks.length; i++) {
+				if (tasks[i] == null) {
+					tasks[i] = new MeLoN_Task(jobName, String.valueOf(i), sessionId);
+					return tasks[i];
+				}
+			}
+		}
+		return null;
 	}
 
 	public void setResources(Configuration yarnConf, Configuration hdfsConf, Map<String, LocalResource> localResources,
@@ -85,6 +113,22 @@ public class MeLoN_AppSession {
 		shellEnv.put("CLASSPATH", classPathEnv.toString());
 	}
 
+	public boolean allTasksScheduled() {
+		for (MeLoN_Task[] tasks : jobTasks.values()) {
+			for (MeLoN_Task task : tasks) {
+				if (task == null) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	public int getTotalTrackedTasks() {
+		return jobTasks.entrySet().stream().filter(entry -> Utils.isJobTypeTracked(entry.getKey(), melonConf))
+				.mapToInt(entry -> entry.getValue().length).sum();
+	}
+
 	public static class Builder {
 		private String jvmArgs;
 		private Configuration melonConf;
@@ -105,6 +149,52 @@ public class MeLoN_AppSession {
 	}
 
 	public class MeLoN_Task {
+
+		private String jobName;
+		private String taskIndex;
+		private String taskUrl;
+		private int sessionId;
+		private Container container;
+		private MeLoN_TaskStatus status;
+
+		public MeLoN_Task(String jobName, String taskIndex, int sessionId) {
+			this.jobName = jobName;
+			this.taskIndex = taskIndex;
+			this.sessionId = sessionId;
+		}
+
+		public String getJobName() {
+			return jobName;
+		}
+
+		public String getTaskIndex() {
+			return taskIndex;
+		}
+
+		public int getSessionId() {
+			return sessionId;
+		}
+
+		public Container getContainer() {
+			return container;
+		}
+
+		public void setContainer(Container container) {
+			this.container = container;
+		}
+
+		public void addContainer(Container container) {
+			setContainer(container);
+			containerIdMap.put(container.getId(), this);
+		}
+
+		public String getId() {
+			return this.jobName + ":" + this.taskIndex;
+		}
+
+		public void setStatus(MeLoN_TaskStatus status) {
+			this.status = status;
+		}
 
 	}
 

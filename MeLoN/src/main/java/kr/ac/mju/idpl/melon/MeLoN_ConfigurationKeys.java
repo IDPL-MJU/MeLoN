@@ -28,8 +28,8 @@ public class MeLoN_ConfigurationKeys {
 	public static final String TASK_EXECUTOR_JVM_OPTS = TASK_PREFIX + "executor-jvm-opts";
 	public static final String TASK_EXECUTOR_JVM_OPTS_DEFAULT = "-Xmx1536m";
 
-	public static final String UNTRACKED_JOBTYPPES = MELON_PREFIX + "untracked.jobtypes";
-	public static final String UNTRACKED_JOBTYPPES_DEFAULT = "ps";
+	public static final String UNTRACKED_JOBTYPES = MELON_PREFIX + "untracked.jobtypes";
+	public static final String UNTRACKED_JOBTYPES_DEFAULT = "ps";
 
 	public static final String SHELL_ENVS = MELON_PREFIX + "shell.envs";
 	public static final String CONTAINER_ENVS = MELON_PREFIX + "container.envs";

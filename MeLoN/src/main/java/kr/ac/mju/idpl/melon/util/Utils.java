@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -37,7 +38,7 @@ public class Utils {
 			}
 		}
 	}
-	
+
 	public static void addResource(String resource, Map<String, LocalResource> localResources, FileSystem fs) {
 		try {
 			if (resource != null) {
@@ -178,5 +179,14 @@ public class Utils {
 				|| fileSignature == 0x74657374 // tar
 				|| fileSignature == 0x75737461 // tar
 				|| (fileSignature & 0xFFFF0000) == 0x1F8B0000; // tar.gz
+	}
+
+	public static boolean isJobTypeTracked(String taskName, Configuration melonConf) {
+		return !Arrays.asList(getUntrackedJobTypes(melonConf)).contains(taskName);
+	}
+
+	public static String[] getUntrackedJobTypes(Configuration conf) {
+		return conf.getStrings(MeLoN_ConfigurationKeys.UNTRACKED_JOBTYPES,
+				MeLoN_ConfigurationKeys.UNTRACKED_JOBTYPES_DEFAULT);
 	}
 }
