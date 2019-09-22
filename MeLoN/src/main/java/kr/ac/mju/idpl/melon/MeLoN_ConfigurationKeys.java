@@ -23,7 +23,7 @@ public class MeLoN_ConfigurationKeys {
 
 	public static final String PYTHON_VENV = APPLICATION_PREFIX + "python-venv";
 	public static final String PYTHON_BIN_PATH = APPLICATION_PREFIX + "python-bin-path";
-	
+
 	public static final String TASK_PREFIX = MELON_PREFIX + "task.";
 	public static final String TASK_EXECUTOR_JVM_OPTS = TASK_PREFIX + "executor-jvm-opts";
 	public static final String TASK_EXECUTOR_JVM_OPTS_DEFAULT = "-Xmx1536m";
@@ -46,5 +46,8 @@ public class MeLoN_ConfigurationKeys {
 	// Job specific resources
 	public static String getResourcesKey(String jobName) {
 		return String.format(MELON_PREFIX + "%s.resources", jobName);
+	}
+	public static String getTaskCommandKey(String jobName) {
+		return String.format(MELON_PREFIX + "%s.command", jobName);
 	}
 }

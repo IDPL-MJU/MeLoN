@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -26,10 +27,67 @@ import org.slf4j.LoggerFactory;
 
 import kr.ac.mju.idpl.melon.LocalizableResource;
 import kr.ac.mju.idpl.melon.MeLoN_ConfigurationKeys;
+import kr.ac.mju.idpl.melon.MeLoN_Constants;
 import kr.ac.mju.idpl.melon.MeLoN_ContainerRequest;
+import net.lingala.zip4j.core.ZipFile;
+import net.lingala.zip4j.exception.ZipException;
 
 public class Utils {
 	private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
+
+	public static void unzipArchive(String src, String dst) {
+		LOG.info("Unzipping " + src + " to destination " + dst);
+		try {
+			ZipFile zipFile = new ZipFile(src);
+			zipFile.extractAll(dst);
+		} catch (ZipException e) {
+			LOG.error("Failed to unzip " + src, e);
+		}
+	}
+
+	public static void extractResources() {
+		if (new File(MeLoN_Constants.MELON_SRC_ZIP_NAME).exists()) {
+			LOG.info("Unpacking src directory..");
+			Utils.unzipArchive(MeLoN_Constants.MELON_SRC_ZIP_NAME, "./");
+		}
+		File venvZip = new File(MeLoN_Constants.PYTHON_VENV_ZIP);
+		if (venvZip.exists() && venvZip.isFile()) {
+			LOG.info("Unpacking Python virtual environment.. ");
+			Utils.unzipArchive(MeLoN_Constants.PYTHON_VENV_ZIP, MeLoN_Constants.PYTHON_VENV_DIR);
+		} else {
+			LOG.info("No virtual environment uploaded.");
+		}
+	}
+
+	public static void initYarnConf(Configuration yarnConf) {
+		addCoreConfs(yarnConf);
+		addComponentConfs(yarnConf, MeLoN_Constants.YARN_DEFAULT_CONF, MeLoN_Constants.YARN_SITE_CONF);
+	}
+
+	public static void initHdfsConf(Configuration hdfsConf) {
+		addCoreConfs(hdfsConf);
+		addComponentConfs(hdfsConf, MeLoN_Constants.HDFS_DEFAULT_CONF, MeLoN_Constants.HDFS_SITE_CONF);
+	}
+
+	private static void addCoreConfs(Configuration conf) {
+		URL coreDefault = Utils.class.getClassLoader().getResource(MeLoN_Constants.CORE_DEFAULT_CONF);
+		if (coreDefault != null) {
+			conf.addResource(coreDefault);
+		}
+		if (new File(MeLoN_Constants.CORE_SITE_CONF).exists()) {
+			conf.addResource(new Path(MeLoN_Constants.CORE_SITE_CONF));
+		}
+	}
+
+	private static void addComponentConfs(Configuration conf, String defaultConfName, String siteConfName) {
+		URL defaultConf = Utils.class.getClassLoader().getResource(defaultConfName);
+		if (defaultConf != null) {
+			conf.addResource(defaultConf);
+		}
+		if (new File(siteConfName).exists()) {
+			conf.addResource(new Path(siteConfName));
+		}
+	}
 
 	public static void addResources(String[] resources, Map<String, LocalResource> localResources, FileSystem fs) {
 		if (null != resources) {
