@@ -30,8 +30,8 @@ public class MeLoN_ConfigurationKeys {
 	public static final String TASK_EXECUTOR_JVM_OPTS = TASK_PREFIX + "executor-jvm-opts";
 	public static final String TASK_EXECUTOR_JVM_OPTS_DEFAULT = "-Xmx1536m";
 
-	public static final String UNTRACKED_TASKTYPES = MELON_PREFIX + "untracked.tasktypes";
-	public static final String UNTRACKED_TASKTYPES_DEFAULT = "ps";
+	public static final String UNTRACKED_JOB_NAMES = MELON_PREFIX + "untracked.jobnames";
+	public static final String UNTRACKED_JOB_NAMES_DEFAULT = "ps";
 
 	public static final String SHELL_ENVS = MELON_PREFIX + "shell.envs";
 	public static final String CONTAINER_ENVS = MELON_PREFIX + "container.envs";
@@ -46,10 +46,10 @@ public class MeLoN_ConfigurationKeys {
 			.unmodifiableList(Arrays.asList(CONTAINER_ENVS, SHELL_ENVS));
 
 	// Task specific resources
-	public static String getResourcesKey(String taskType) {
-		return String.format(MELON_PREFIX + "%s.resources", taskType);
+	public static String getResourcesKey(String jobName) {
+		return String.format(MELON_PREFIX + "%s.resources", jobName);
 	}
-	public static String getTaskCommandKey(String taskType) {
-		return String.format(MELON_PREFIX + "%s.command", taskType);
+	public static String getTaskCommandKey(String jobName) {
+		return String.format(MELON_PREFIX + "%s.command", jobName);
 	}
 }

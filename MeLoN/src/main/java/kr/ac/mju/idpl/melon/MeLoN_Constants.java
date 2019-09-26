@@ -17,10 +17,12 @@ public class MeLoN_Constants {
 
 	public static final String MELON_JAR = "melon.jar";
 	public static final String MELON_FINAL_XML = "melon-final.xml";
-	public static final String MELON_SRC_ZIP_NAME = "melon_src.zip";
+	public static final String MELON_SRC_ZIP_NAME = "src.zip";
+	public static final String MELON_SRC_ZIP_DIR = "./";
 	public static final String PYTHON_VENV_ZIP = "venv.zip";
 
 	public static final String MELON_CONF_PREFIX = "MELON_CONF";
+	public static final String MELON_JAR_PREFIX = "MELON_JAR";
 	public static final String ARCHIVE_SUFFIX = "#archive";
 	public static final String RESOURCE_DIVIDER = "::";
 
@@ -29,7 +31,7 @@ public class MeLoN_Constants {
 	public static final String LENGTH_SUFFIX = "_LENGTH";
 
 	// TensorFlow job constants
-	public static final String TASK_TYPE = "TASK_TYPE";
+	public static final String JOB_NAME = "JOB_NAME";
 	public static final String TASK_INDEX = "TASK_INDEX";
 	public static final String TASK_NUM = "TASK_NUM";
 	public static final String CLUSTER_SPEC = "CLUSTER_SPEC";

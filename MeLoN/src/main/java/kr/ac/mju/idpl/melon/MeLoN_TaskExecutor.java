@@ -22,7 +22,7 @@ import kr.ac.mju.idpl.melon.util.Utils;
 public class MeLoN_TaskExecutor {
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_TaskExecutor.class);
 	private Configuration melonConf = new Configuration(false);
-	private String taskType;
+	private String jobName;
 	private int taskIndex;
 	private int numTasks;
 	private String taskId;
@@ -49,7 +49,7 @@ public class MeLoN_TaskExecutor {
 			e.printStackTrace();
 		}
 		LOG.info("Child process exited with exit code " + exitCode);
-	    System.exit(exitCode);
+		System.exit(exitCode);
 	}
 
 	private int run() throws Exception {
@@ -72,15 +72,16 @@ public class MeLoN_TaskExecutor {
 			LOG.error("Failed to register worker with AM.");
 			throw new Exception("Failed to register worker with AM.");
 		}
-		LOG.info("Successfully registered and got cluster spec: " + clusterSpec);
+		LOG.info("Successfully registered and got cluster spec: {}", clusterSpec);
 
-		shellEnvs.put(MeLoN_Constants.TASK_TYPE, String.valueOf(taskType));
+		shellEnvs.put(MeLoN_Constants.JOB_NAME, String.valueOf(jobName));
 		shellEnvs.put(MeLoN_Constants.TASK_INDEX, String.valueOf(taskIndex));
 		shellEnvs.put(MeLoN_Constants.CLUSTER_SPEC, String.valueOf(clusterSpec));
 
 		releasePorts();
 
 		exitCode = executeShell();
+		LOG.info("Execute shell is finished with exitcode {}", exitCode);
 		registerExecutionResult();
 		return exitCode;
 	}
@@ -88,9 +89,9 @@ public class MeLoN_TaskExecutor {
 	private void registerExecutionResult() throws Exception {
 		String response;
 		int attempt = 60;
-		while(attempt > 0) {
-			response = amClient.registerExecutionResult(exitCode, taskType, String.valueOf(taskIndex));
-			if(response != null) {
+		while (attempt > 0) {
+			response = amClient.registerExecutionResult(exitCode, jobName, String.valueOf(taskIndex));
+			if (response != null) {
 				LOG.info("AM response for result execution run: " + response);
 				break;
 			}
@@ -103,39 +104,40 @@ public class MeLoN_TaskExecutor {
 		LOG.info("Executing command: " + taskCommand);
 		String executablePath = taskCommand.trim().split(" ")[0];
 		File executable = new File(executablePath);
+
 		if (!executable.canExecute()) {
 			if (!executable.setExecutable(true)) {
 				LOG.warn("Failed to make " + executable + " executable");
 			}
 		}
 		ProcessBuilder taskProcessBuilder = new ProcessBuilder("bash", "-c", taskCommand);
-	    taskProcessBuilder.redirectError(ProcessBuilder.Redirect.INHERIT);
-	    taskProcessBuilder.redirectOutput(ProcessBuilder.Redirect.INHERIT);
-	    // Unset MALLOC_ARENA_MAX for better performance, see https://github.com/linkedin/TonY/issues/346
-	    taskProcessBuilder.environment().remove("MALLOC_ARENA_MAX");
-	    if (shellEnvs != null) {
-	      taskProcessBuilder.environment().putAll(shellEnvs);
-	    }
-	    Process taskProcess = taskProcessBuilder.start();
-	    taskProcess.waitFor();
-	    return taskProcess.exitValue();
+		taskProcessBuilder.redirectError(ProcessBuilder.Redirect.INHERIT);
+		taskProcessBuilder.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+
+		taskProcessBuilder.environment().remove("MALLOC_ARENA_MAX");
+		if (shellEnvs != null) {
+			taskProcessBuilder.environment().putAll(shellEnvs);
+		}
+		Process taskProcess = taskProcessBuilder.start();
+		taskProcess.waitFor();
+		return taskProcess.exitValue();
 	}
 
 	private void initConfigs() throws Exception {
-		taskType = System.getenv(MeLoN_Constants.TASK_TYPE);
+		jobName = System.getenv(MeLoN_Constants.JOB_NAME);
 		taskIndex = Integer.parseInt(System.getenv(MeLoN_Constants.TASK_INDEX));
 		numTasks = Integer.parseInt(System.getenv(MeLoN_Constants.TASK_NUM));
-		taskId = taskType + ":" + taskIndex;
+		taskId = jobName + ":" + taskIndex;
 		LOG.info("Executor is running task " + taskId);
 
 		amHost = System.getenv(MeLoN_Constants.AM_HOST);
-		amPort = Integer.parseInt(MeLoN_Constants.AM_PORT);
+		amPort = Integer.parseInt(System.getenv(MeLoN_Constants.AM_PORT));
 
 		melonConf.addResource(new Path(MeLoN_Constants.MELON_FINAL_XML));
 		String[] shellEnvsStr = melonConf.getStrings(MeLoN_ConfigurationKeys.SHELL_ENVS);
 		shellEnvs = Utils.parseKeyValue(shellEnvsStr);
-		taskCommand = melonConf.get(MeLoN_ConfigurationKeys.getTaskCommandKey(taskType),
-				MeLoN_ConfigurationKeys.CONTAINERS_COMMAND);
+		taskCommand = melonConf.get(MeLoN_ConfigurationKeys.getTaskCommandKey(jobName),
+				melonConf.get(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND));
 		if (taskCommand == null) {
 			LOG.error("Task command is empty. Please see task command in configuration files.");
 			throw new IllegalArgumentException();
@@ -157,12 +159,12 @@ public class MeLoN_TaskExecutor {
 		ContainerId containerId = ContainerId
 				.fromString(System.getenv(ApplicationConstants.Environment.CONTAINER_ID.name()));
 		String hostname = System.getenv(ApplicationConstants.Environment.NM_HOST.name());
-		LOG.info("Connecting to " + amHost + ":" + amPort + " to register worker spec: " + taskType + " " + taskIndex
+		LOG.info("Connecting to " + amHost + ":" + amPort + " to register worker spec: " + jobName + " " + taskIndex
 				+ " " + hostname + ":" + rpcPort);
 		while (true) {
-			receivedClusterSpec = amClient.registerWorkerSpec(taskType + ":" + taskIndex, hostname + ":" + rpcPort);
+			receivedClusterSpec = amClient.registerWorkerSpec(jobName + ":" + taskIndex, hostname + ":" + rpcPort);
 			if (receivedClusterSpec != null) {
-				LOG.info("Received clusterSpec : " + receivedClusterSpec);
+				LOG.info("Received clusterSpec: " + receivedClusterSpec);
 				return receivedClusterSpec;
 			}
 			Thread.sleep(3000);

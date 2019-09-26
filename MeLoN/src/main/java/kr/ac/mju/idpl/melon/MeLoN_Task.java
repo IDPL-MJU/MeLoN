@@ -3,7 +3,7 @@ package kr.ac.mju.idpl.melon;
 import org.apache.hadoop.yarn.api.records.Container;
 
 public class MeLoN_Task {
-	private String taskType;
+	private String jobName;
 	private String taskIndex;
 	private String taskUrl;
 	private String host;
@@ -17,13 +17,13 @@ public class MeLoN_Task {
 		return completed;
 	}
 
-	public MeLoN_Task(String taskType, String taskIndex) {
-		this.taskType = taskType;
+	public MeLoN_Task(String jobName, String taskIndex) {
+		this.jobName = jobName;
 		this.taskIndex = taskIndex;
 	}
 
-	public String getTaskType() {
-		return taskType;
+	public String getJobName() {
+		return jobName;
 	}
 
 	public String getTaskIndex() {
@@ -55,7 +55,7 @@ public class MeLoN_Task {
 	}
 
 	public String getId() {
-		return this.taskType + ":" + this.taskIndex;
+		return this.jobName + ":" + this.taskIndex;
 	}
 
 	public void setStatus(MeLoN_TaskStatus status) {

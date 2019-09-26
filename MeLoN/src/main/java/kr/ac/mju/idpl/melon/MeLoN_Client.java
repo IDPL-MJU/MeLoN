@@ -117,7 +117,7 @@ public class MeLoN_Client {
 		if (hdfsConfAddress != null) {
 			hdfsConf.addResource(new Path(hdfsConfAddress));
 		}
-		LOG.info("Finished init HDFS configurations...");
+		LOG.info("Finished initializing HDFS configurations...");
 	}
 
 	private void initYarnConf() {
@@ -131,7 +131,7 @@ public class MeLoN_Client {
 		if (yarnConfAddress != null) {
 			yarnConf.addResource(new Path(this.yarnConfAddress));
 		} 
-		LOG.info("Finished init YARN configurations...");
+		LOG.info("Finished initializing YARN configurations...");
 	}
 
 	private void initOptions() {
@@ -154,7 +154,7 @@ public class MeLoN_Client {
 	private void initMelonConf(CommandLine cliParser) throws IOException {
 		LOG.info("Starting init melon configurations");
 		LOG.info("Initializing from a default configuration file. 'melon-default.xml'");
-		this.melonConf.addResource("melon-default.xml");
+		this.melonConf.addResource(new Path("melon-default.xml"));
 		if (cliParser.hasOption("conf_file")) {
 			// assume local file only
 			Path confFilePath = new Path(cliParser.getOptionValue("conf_file"));
@@ -162,7 +162,7 @@ public class MeLoN_Client {
 			melonConf.addResource(confFilePath);
 		} else {
 			LOG.info("Adding " + "melon.xml" + " to melon configurations.");
-			melonConf.addResource("melon.xml");
+			melonConf.addResource(new Path("melon.xml"));
 		}
 
 		if (cliParser.hasOption("conf")) {
@@ -196,7 +196,6 @@ public class MeLoN_Client {
 		initHdfsConf();
 		initYarnConf();
 		yarnClient.init(yarnConf);
-		LOG.info("Finished init yarn configuration to YarnClient.");
 
 		String amMemoryString = melonConf.get(MeLoN_ConfigurationKeys.AM_MEMORY,
 				MeLoN_ConfigurationKeys.AM_MEMORY_DEFAULT);
@@ -206,7 +205,7 @@ public class MeLoN_Client {
 		pythonBinaryPath = cliParser.getOptionValue("python_bin_path", "Python/bin/python");
 		pythonVenv = cliParser.getOptionValue("python_venv", "venv.zip");
 		taskParams = cliParser.getOptionValue("task_params");
-		executes = buildTaskCommand(pythonBinaryPath, pythonVenv, cliParser.getOptionValue("executes"), taskParams);
+		executes = buildTaskCommand(pythonVenv, pythonBinaryPath, cliParser.getOptionValue("executes"), taskParams);
 		melonConf.set(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND, executes);
 
 		srcDir = cliParser.getOptionValue("src_dir", "src");
@@ -220,12 +219,10 @@ public class MeLoN_Client {
 			throw new IllegalArgumentException("Invalid virtual cores specified for application master, exiting."
 					+ " Specified virtual cores=" + amVCores);
 		}
-		LOG.info("...?");
 		if (Utils.getNumTotalTasks(melonConf) == 0 && amGpus > 0) {
 			LOG.warn("It seems you reserved " + amGpus
 					+ " GPUs in application master (driver, which doesn't perform training) during distributed training.");
 		}
-		LOG.info("...?");
 
 		List<String> shellEnvsPair = new ArrayList<>();
 		if (melonConf.get(MeLoN_ConfigurationKeys.SHELL_ENVS) != null) {
@@ -256,7 +253,6 @@ public class MeLoN_Client {
 		if (!containerEnvs.isEmpty()) {
 			melonConf.setStrings(MeLoN_ConfigurationKeys.CONTAINER_ENVS, containerEnvsPair.toArray(new String[0]));
 		}
-		LOG.info("Finished MeLoN_Client's init");
 		return true;
 	}
 
@@ -286,13 +282,11 @@ public class MeLoN_Client {
 
 	private void addToLocalResource(String srcPath, FileSystem fs, String dstPath, LocalResourceType resourceType,
 			Map<String, LocalResource> localResources) throws IOException {
-		LOG.info("Copying [" + srcPath + "] to [" + dstPath + "]...");
 		Path src = new Path(srcPath);
 		Path dst = new Path(appResourcesPath, dstPath);
 		fs.copyFromLocalFile(false, true, src, dst);
 		FileStatus dstFileStatus = fs.getFileStatus(dst);
 		fs.setPermission(dst, new FsPermission((short) 0770));
-		LOG.info("Copied [" + dstPath + "] to " + "[" + dst + "]");
 
 		LocalResource lr = LocalResource.newInstance(ConverterUtils.getYarnUrlFromURI(dst.toUri()), // setResource
 				resourceType, // setType
@@ -300,7 +294,6 @@ public class MeLoN_Client {
 				dstFileStatus.getLen(), // setSize
 				dstFileStatus.getModificationTime()); // setTimestamp
 
-		LOG.info("Adding [" + dstPath + "] to LocalResources.");
 		localResources.put(dstPath, lr);
 	}
 
@@ -377,16 +370,18 @@ public class MeLoN_Client {
 
 		setAMEnvironment(localResources, fs);
 		amContainer.setEnvironment(containerEnvs);
-
 		amContainer.setCommands(buildAMCommand());
 
 		appContext.setAMContainerSpec(amContainer);
+		LOG.info("*********am.resources : " + localResources.toString());
+		LOG.info("*********am.resources : " + localResources);
 
 		LOG.info("Submitting YARN application" + "["+ appId + "]");
 		yarnClient.submitApplication(appContext);
+		LOG.info("***melonFinalConf : " + melonConf.getValByRegex("melon\\.([a-z]+)\\.([a-z]+)"));
 		// ApplicationReport report = yarnClient.getApplicationReport(appId);
-
-		return monitorApplication();
+		//return monitorApplication();
+		return 0;
 	}
 
 	public List<String> buildAMCommand() {
@@ -406,15 +401,24 @@ public class MeLoN_Client {
 	}
 
 	private void setAMEnvironment(Map<String, LocalResource> localResources, FileSystem fs) throws IOException {
-		LocalResource melonConfResource = localResources.get(MeLoN_Constants.MELON_FINAL_XML);
-		Path rsrcPath = new Path(fs.getHomeDirectory(), melonConfResource.getResource().getFile());
-		FileStatus rsrcStatus = fs.getFileStatus(rsrcPath);
-		long rsrcLength = rsrcStatus.getLen();
-		long rsrcTimestamp = rsrcStatus.getModificationTime();
-		containerEnvs.put(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.PATH_SUFFIX, rsrcPath.toString());
-		containerEnvs.put(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.LENGTH_SUFFIX, Long.toString(rsrcLength));
+		LocalResource mFinalConfResource = localResources.get(MeLoN_Constants.MELON_FINAL_XML);
+		Path mFinalConfPath = new Path(fs.getHomeDirectory(), mFinalConfResource.getResource().getFile());
+		FileStatus mFinalConfStatus = fs.getFileStatus(mFinalConfPath);
+		long mFinalConfLength = mFinalConfStatus.getLen();
+		long mFinalConfTimestamp = mFinalConfStatus.getModificationTime();
+		containerEnvs.put(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.PATH_SUFFIX, mFinalConfPath.toString());
+		containerEnvs.put(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.LENGTH_SUFFIX, Long.toString(mFinalConfLength));
 		containerEnvs.put(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.TIMESTAMP_SUFFIX,
-				Long.toString(rsrcTimestamp));
+				Long.toString(mFinalConfTimestamp));
+		LocalResource mJarResource = localResources.get(MeLoN_Constants.MELON_JAR);
+		Path mJarPath = new Path(fs.getHomeDirectory(), mJarResource.getResource().getFile());
+		FileStatus mJarStatus = fs.getFileStatus(mJarPath);
+		long mJarLength = mJarStatus.getLen();
+		long mJarTimestamp = mJarStatus.getModificationTime();
+		containerEnvs.put(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.PATH_SUFFIX, mJarPath.toString());
+		containerEnvs.put(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.LENGTH_SUFFIX, Long.toString(mJarLength));
+		containerEnvs.put(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.TIMESTAMP_SUFFIX,
+				Long.toString(mJarTimestamp));
 
 		// Setting all required classpaths including the classpath to "." for the app jar
 		StringBuilder classPathEnv = new StringBuilder(ApplicationConstants.Environment.CLASSPATH.$())
@@ -430,7 +434,7 @@ public class MeLoN_Client {
 	private String processMelonFinalConf() throws IOException, ParseException {
 		FileSystem fs = FileSystem.get(hdfsConf);
 		if (srcDir != null) {
-			LOG.info("Uploading src directory ...");
+			LOG.info("Uploading src directory...");
 			if (Utils.isArchive(srcDir)) {
 				uploadFileAndSetConfResources(new Path(srcDir), fs, appResourcesPath,
 						MeLoN_Constants.MELON_SRC_ZIP_NAME, LocalResourceType.FILE,
@@ -555,7 +559,7 @@ public class MeLoN_Client {
 	private int monitorApplication() throws YarnException, IOException {
 		while (true) {
 			try {
-				Thread.sleep(1000);
+				Thread.sleep(5000);
 			} catch (InterruptedException e) {
 
 			}

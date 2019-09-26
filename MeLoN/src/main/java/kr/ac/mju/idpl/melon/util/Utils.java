@@ -36,7 +36,7 @@ public class Utils {
 	private static final Logger LOG = LoggerFactory.getLogger(Utils.class);
 
 	public static void unzipArchive(String src, String dst) {
-		LOG.info("Unzipping " + src + " to destination " + dst);
+		LOG.info("Unpacking " + src + " to destination " + dst);
 		try {
 			ZipFile zipFile = new ZipFile(src);
 			zipFile.extractAll(dst);
@@ -48,11 +48,11 @@ public class Utils {
 	public static void extractResources() {
 		if (new File(MeLoN_Constants.MELON_SRC_ZIP_NAME).exists()) {
 			LOG.info("Unpacking src directory..");
-			Utils.unzipArchive(MeLoN_Constants.MELON_SRC_ZIP_NAME, "./");
+			Utils.unzipArchive(MeLoN_Constants.MELON_SRC_ZIP_NAME, MeLoN_Constants.MELON_SRC_ZIP_DIR);
 		}
 		File venvZip = new File(MeLoN_Constants.PYTHON_VENV_ZIP);
 		if (venvZip.exists() && venvZip.isFile()) {
-			LOG.info("Unpacking Python virtual environment.. ");
+			LOG.info("Unpacking Python virtual environment..");
 			Utils.unzipArchive(MeLoN_Constants.PYTHON_VENV_ZIP, MeLoN_Constants.PYTHON_VENV_DIR);
 		} else {
 			LOG.info("No virtual environment uploaded.");
@@ -100,6 +100,7 @@ public class Utils {
 	public static void addResource(String resource, Map<String, LocalResource> localResources, FileSystem fs) {
 		try {
 			if (resource != null) {
+				LOG.info("***Resource is not null!!!!!" + resource);
 				// Check the format of the path, if the path is of path#archive, we set resource
 				// type as ARCHIVE
 				LocalizableResource lr = new LocalizableResource(resource, fs);
@@ -135,15 +136,15 @@ public class Utils {
 	}
 
 	public static int getNumTotalTasks(Configuration conf) {
-		return getAllJobTypes(conf).stream().mapToInt(type -> conf.getInt("melon." + type + ".instances", 0)).sum();
+		return getAllJobNames(conf).stream().mapToInt(type -> conf.getInt("melon." + type + ".instances", 0)).sum();
 	}
 
-	public static Set<String> getAllJobTypes(Configuration conf) {
-		return conf.getValByRegex(MeLoN_ConfigurationKeys.INSTANCES_REGEX).keySet().stream().map(Utils::getTaskType)
+	public static Set<String> getAllJobNames(Configuration conf) {
+		return conf.getValByRegex(MeLoN_ConfigurationKeys.INSTANCES_REGEX).keySet().stream().map(Utils::getJobName)
 				.collect(Collectors.toSet());
 	}
 
-	public static String getTaskType(String confKey) {
+	public static String getJobName(String confKey) {
 		Pattern instancePattern = Pattern.compile(MeLoN_ConfigurationKeys.INSTANCES_REGEX);
 		Matcher instanceMatcher = instancePattern.matcher(confKey);
 		if (instanceMatcher.matches()) {
@@ -192,10 +193,13 @@ public class Utils {
 	}
 
 	public static Map<String, MeLoN_ContainerRequest> parseContainerRequests(Configuration conf) {
-		Set<String> jobNames = getAllJobTypes(conf);
+		Set<String> jobNames = getAllJobNames(conf);
+		LOG.info("***conf : " + conf.getValByRegex("melon\\.([a-z]+)\\.([a-z]+)"));
+		LOG.info("***jobNames : " + jobNames.toString());
 		Map<String, MeLoN_ContainerRequest> containerRequests = new HashMap<>();
 		int priority = 0;
 		for (String jobName : jobNames) {
+			LOG.info("***loop... jobName : " + jobName);
 			int numInstances = conf.getInt("melon." + jobName + ".instances", 0);
 			String memoryString = conf.get("melon." + jobName + ".memory", "2g");
 			long memory = Long.parseLong(parseMemoryString(memoryString));
@@ -216,6 +220,7 @@ public class Utils {
 				priority++;
 			}
 		}
+		LOG.info("***containerRequest: " + containerRequests.toString());
 		return containerRequests;
 	}
 
@@ -239,12 +244,12 @@ public class Utils {
 				|| (fileSignature & 0xFFFF0000) == 0x1F8B0000; // tar.gz
 	}
 
-	public static boolean isJobTypeTracked(String taskName, Configuration melonConf) {
-		return !Arrays.asList(getUntrackedJobTypes(melonConf)).contains(taskName);
+	public static boolean isJobNameTracked(String jobName, Configuration melonConf) {
+		return !Arrays.asList(getUntrackedJobTypes(melonConf)).contains(jobName);
 	}
 
 	public static String[] getUntrackedJobTypes(Configuration conf) {
-		return conf.getStrings(MeLoN_ConfigurationKeys.UNTRACKED_TASKTYPES,
-				MeLoN_ConfigurationKeys.UNTRACKED_TASKTYPES_DEFAULT);
+		return conf.getStrings(MeLoN_ConfigurationKeys.UNTRACKED_JOB_NAMES,
+				MeLoN_ConfigurationKeys.UNTRACKED_JOB_NAMES_DEFAULT);
 	}
 }

@@ -113,6 +113,14 @@ public class MeLoN_ApplicationMaster {
 
 	private boolean init(String[] args) {
 		LOG.info("Starting init...");
+		Utils.initYarnConf(yarnConf);
+		Utils.initHdfsConf(hdfsConf);
+		try {
+			resourceFs = FileSystem.get(hdfsConf);
+		} catch (IOException e) {
+			LOG.error("Failed to create FileSystem object", e);
+			return false;
+		}
 		CommandLine cliParser;
 		try {
 			cliParser = new GnuParser().parse(opts, args);
@@ -145,11 +153,11 @@ public class MeLoN_ApplicationMaster {
 			return false;
 		}
 
+		LOG.info("Starting amRMClient...");
 		AMRMClientAsync.CallbackHandler allocListener = new RMCallbackHandler();
 		amRMClient = AMRMClientAsync.createAMRMClientAsync(1000, allocListener);
 		amRMClient.init(yarnConf);
 		amRMClient.start();
-		LOG.info("Starting amRMClient...");
 
 		amHostname = System.getenv(ApplicationConstants.Environment.NM_HOST.name());
 		// amHostname = NetUtils.getHostname();
@@ -172,22 +180,27 @@ public class MeLoN_ApplicationMaster {
 		nmClientAsync.init(yarnConf);
 		nmClientAsync.start();
 		LOG.info("Starting NMCallbackHandler...");
-		
+
 		LOG.info("Starting application RPC server at: " + amHostname + ":" + amPort);
 		rpcServer.start();
 		LOG.info("RPCServer set resources");
 		rpcServer.setResources(yarnConf, hdfsConf, localResources, containerEnvs, hdfsClasspath);
 		LOG.info("Listing requests");
 		List<MeLoN_ContainerRequest> requests = rpcServer.getContainerRequests();
+		LOG.info("Requests : " + requests.toString());
 		for (MeLoN_ContainerRequest request : requests) {
+			LOG.info("Requesting container ...");
 			ContainerRequest containerAsk = setupContainerAskForRM(request);
-			if (!askedContainerMap.containsKey(request.getTaskType())) {
-				askedContainerMap.put(request.getTaskType(), new ArrayList<>());
+			if (!askedContainerMap.containsKey(request.getJobName())) {
+				askedContainerMap.put(request.getJobName(), new ArrayList<>());
 			}
-			askedContainerMap.get(request.getTaskType()).add(containerAsk);
+			LOG.info("Task type is " + request.getJobName());
+			askedContainerMap.get(request.getJobName()).add(containerAsk);
+			LOG.info("addContainerRequest");
 			amRMClient.addContainerRequest(containerAsk);
+			LOG.info("done");
 		}
-		while (true) {
+		while (!done) {
 			if (rpcServer.isTrainingFinished()) {
 				LOG.info("Training has finished.");
 				break;
@@ -204,7 +217,7 @@ public class MeLoN_ApplicationMaster {
 		FinalApplicationStatus status = rpcServer.getTrainingFinalStatus();
 		if (status != FinalApplicationStatus.SUCCEEDED) {
 			LOG.info("Training finished with failure!");
-		}else {
+		} else {
 			LOG.info("Training finished successfully!");
 		}
 		return status == FinalApplicationStatus.SUCCEEDED;
@@ -241,28 +254,30 @@ public class MeLoN_ApplicationMaster {
 
 		@Override
 		public void onContainerStatusReceived(ContainerId containerId, ContainerStatus containerStatus) {
-			LOG.info("Container Status: id =" + containerId + ", status =" + containerStatus);
+			LOG.info("Container Status: id = {}, status = {}", containerId, containerStatus);
 		}
 
 		@Override
 		public void onContainerStopped(ContainerId containerId) {
-			LOG.info("Container " + containerId + " finished with exitStatus " + ContainerExitStatus.KILLED_BY_APPMASTER
-					+ ".");
+			LOG.info("Container {} finished with exitStatus {}.", containerId, ContainerExitStatus.KILLED_BY_APPMASTER);
 		}
 
 		@Override
 		public void onGetContainerStatusError(ContainerId containerId, Throwable t) {
-			LOG.error("Failed to query the status of container " + containerId);
+			LOG.error("Failed to query the status of container {}", containerId);
 		}
 
 		@Override
 		public void onStartContainerError(ContainerId containerId, Throwable t) {
-			LOG.error("Failed to start container " + containerId);
+			LOG.info("onStartContainerError {}", containerId);
+			LOG.error("Failed to start container {}", containerId);
+			// need processing something
 		}
 
 		@Override
 		public void onStopContainerError(ContainerId containerId, Throwable t) {
-			LOG.error("Failed to stop container " + containerId);
+			LOG.info("onStopContainerError {}", containerId);
+			LOG.error("Failed to stop container {}", containerId);
 		}
 
 	}
@@ -272,8 +287,7 @@ public class MeLoN_ApplicationMaster {
 		@Override
 		public float getProgress() {
 			int numTotalTrackedTasks = rpcServer.getTotalTrackedTasks();
-			return numTotalTrackedTasks > 0 ? (float) rpcServer.getNumCompletedTrackedTasks() / numTotalTrackedTasks
-					: 0;
+			return numTotalTrackedTasks > 0 ? (float) rpcServer.getNumCompletedTrackedTasks() / numTotalTrackedTasks : 0;
 		}
 
 		@Override
@@ -309,6 +323,8 @@ public class MeLoN_ApplicationMaster {
 			LOG.error("Received error in AM to RM call", throwable);
 			done = true;
 			amRMClient.stop();
+			nmClientAsync.stop();
+			// need more detail
 		}
 
 		@Override
@@ -319,6 +335,7 @@ public class MeLoN_ApplicationMaster {
 		@Override
 		public void onShutdownRequest() {
 			LOG.info("onShutdownRequest called in RMCallbackHandler");
+			done = true;
 		}
 
 	}
@@ -341,7 +358,7 @@ public class MeLoN_ApplicationMaster {
 
 			// Add job type specific resources
 			Map<String, LocalResource> containerResources = new ConcurrentHashMap<>(localResources);
-			String[] resources = melonConf.getStrings(MeLoN_ConfigurationKeys.getResourcesKey(task.getTaskType()));
+			String[] resources = melonConf.getStrings(MeLoN_ConfigurationKeys.getResourcesKey(task.getJobName()));
 			Utils.addResources(resources, containerResources, resourceFs);
 
 			// All resources available to all containers
@@ -354,9 +371,9 @@ public class MeLoN_ApplicationMaster {
 
 			Map<String, String> containerLaunchEnvs = new ConcurrentHashMap<>(containerEnvs);
 
-			String taskType = task.getTaskType();
+			String jobName = task.getJobName();
 			String taskIndex = task.getTaskIndex();
-			containerLaunchEnvs.put(MeLoN_Constants.TASK_TYPE, taskType);
+			containerLaunchEnvs.put(MeLoN_Constants.JOB_NAME, jobName);
 			containerLaunchEnvs.put(MeLoN_Constants.TASK_INDEX, taskIndex);
 			containerLaunchEnvs.put(MeLoN_Constants.TASK_NUM, String.valueOf(rpcServer.getTotalTrackedTasks()));
 			// containerLaunchEnvs.put(MeLoN_Constants.SESSION_ID,

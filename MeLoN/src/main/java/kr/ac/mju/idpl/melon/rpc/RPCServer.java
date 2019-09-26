@@ -69,6 +69,7 @@ public class RPCServer extends Thread implements RPCProtocol {
 		this.jvmArgs = builder.jvmArgs;
 		this.containerRequests = Utils.parseContainerRequests(builder.melonConf);
 		for (Map.Entry<String, MeLoN_ContainerRequest> entry : containerRequests.entrySet()) {
+			LOG.info("jobtasks put request : " + entry.getValue().getJobName() + " - mem:" + entry.getValue().getMemory() + ", vcores:" + entry.getValue().getvCores());
 			jobTasks.put(entry.getKey(), new MeLoN_Task[entry.getValue().getNumInstances()]);
 		}
 		this.melonConf = builder.melonConf;
@@ -84,6 +85,7 @@ public class RPCServer extends Thread implements RPCProtocol {
 	}
 
 	public List<MeLoN_ContainerRequest> getContainerRequests() {
+		LOG.info("Calling getContainerRequests");
 		List<MeLoN_ContainerRequest> requests = new ArrayList<>();
 		for (Map.Entry<String, MeLoN_Task[]> entry : jobTasks.entrySet()) {
 			MeLoN_Task[] tasks = entry.getValue();
@@ -93,20 +95,21 @@ public class RPCServer extends Thread implements RPCProtocol {
 				}
 			}
 		}
+		LOG.info("Return containerRequests");
 		return requests;
 	}
 
 	public synchronized MeLoN_Task getAndInitMatchingTaskByPriority(int priority) {
 		for (Map.Entry<String, MeLoN_ContainerRequest> entry : containerRequests.entrySet()) {
-			String taskType = entry.getKey();
+			String jobName = entry.getKey();
 			if (entry.getValue().getPriority() != priority) {
-				LOG.debug("Ignoring taskType {" + taskType + "} as priority doesn't match");
+				LOG.debug("Ignoring jobName {" + jobName + "} as priority doesn't match");
 				continue;
 			}
-			MeLoN_Task[] tasks = jobTasks.get(taskType);
+			MeLoN_Task[] tasks = jobTasks.get(jobName);
 			for (int i = 0; i < tasks.length; i++) {
 				if (tasks[i] == null) {
-					tasks[i] = new MeLoN_Task(taskType, String.valueOf(i));
+					tasks[i] = new MeLoN_Task(jobName, String.valueOf(i));
 					return tasks[i];
 				}
 			}
@@ -124,7 +127,7 @@ public class RPCServer extends Thread implements RPCProtocol {
 			MeLoN_Task[] tasks = entry.getValue();
 
 			// If the task type is not tracked, continue.
-			if (!Utils.isJobTypeTracked(jobName, melonConf)) {
+			if (!Utils.isJobNameTracked(jobName, melonConf)) {
 				continue;
 			}
 
@@ -169,8 +172,10 @@ public class RPCServer extends Thread implements RPCProtocol {
 	public void setResources(Configuration yarnConf, Configuration hdfsConf, Map<String, LocalResource> localResources,
 			Map<String, String> shellEnv, String hdfsClasspathDir) {
 
+		LOG.info("Calling setResources");
 		Map<String, String> env = System.getenv();
 		String melonConfPath = env.get(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.PATH_SUFFIX);
+		LOG.info("melonConfPath : " + melonConfPath);
 		long melonConfTimestamp = Long
 				.parseLong(env.get(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.TIMESTAMP_SUFFIX));
 		long melonConfLength = Long
@@ -180,9 +185,22 @@ public class RPCServer extends Thread implements RPCProtocol {
 				ConverterUtils.getYarnUrlFromURI(URI.create(melonConfPath)), LocalResourceType.FILE,
 				LocalResourceVisibility.PRIVATE, melonConfLength, melonConfTimestamp);
 		localResources.put(MeLoN_Constants.MELON_FINAL_XML, melonConfResource);
+		
+		String melonJarPath = env.get(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.PATH_SUFFIX);
+		LOG.info("melonJarPath : " + melonJarPath);
+		long melonJarTimestamp = Long
+				.parseLong(env.get(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.TIMESTAMP_SUFFIX));
+		long melonJarLength = Long
+				.parseLong(env.get(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.LENGTH_SUFFIX));
+
+		LocalResource melonJarResource = LocalResource.newInstance(
+				ConverterUtils.getYarnUrlFromURI(URI.create(melonJarPath)), LocalResourceType.FILE,
+				LocalResourceVisibility.PRIVATE, melonJarLength, melonJarTimestamp);
+		localResources.put(MeLoN_Constants.MELON_JAR, melonJarResource);
 
 		try {
 			if (hdfsClasspathDir != null) {
+				LOG.info("hdfsClasspathDir is null");
 				FileSystem fs = FileSystem.get(new URI(hdfsClasspathDir), hdfsConf);
 				Utils.addResource(hdfsClasspathDir, localResources, fs);
 			}
@@ -217,23 +235,23 @@ public class RPCServer extends Thread implements RPCProtocol {
 	}
 
 	public int getTotalTrackedTasks() {
-		return jobTasks.entrySet().stream().filter(entry -> Utils.isJobTypeTracked(entry.getKey(), melonConf))
+		return jobTasks.entrySet().stream().filter(entry -> Utils.isJobNameTracked(entry.getKey(), melonConf))
 				.mapToInt(entry -> entry.getValue().length).sum();
 	}
 
 	public int getNumCompletedTrackedTasks() {
-		return (int) jobTasks.entrySet().stream().filter(entry -> Utils.isJobTypeTracked(entry.getKey(), melonConf))
+		return (int) jobTasks.entrySet().stream().filter(entry -> Utils.isJobNameTracked(entry.getKey(), melonConf))
 				.flatMap(entry -> Arrays.stream(entry.getValue())).filter(task -> task != null && task.isCompleted())
 				.count();
 	}
 
-	private MeLoN_Task getTask(String taskType, String taskIndex) {
+	private MeLoN_Task getTask(String jobName, String taskIndex) {
 		for (Map.Entry<String, MeLoN_Task[]> entry : jobTasks.entrySet()) {
 			MeLoN_Task[] tasks = entry.getValue();
 			for (MeLoN_Task task : tasks) {
-				String type = task.getTaskType();
+				String type = task.getJobName();
 				String index = task.getTaskIndex();
-				if (type.equals(taskType) && index.equals(taskIndex)) {
+				if (type.equals(jobName) && index.equals(taskIndex)) {
 					return task;
 				}
 			}
@@ -277,7 +295,7 @@ public class RPCServer extends Thread implements RPCProtocol {
 		Map<String, List<String>> map = new HashMap<>();
 
 		for (Map.Entry<String, MeLoN_Task[]> entry : jobTasks.entrySet()) {
-			String taskType = entry.getKey();
+			String jobName = entry.getKey();
 			MeLoN_Task[] tasks = entry.getValue();
 
 			List<String> builder = new ArrayList<>();
@@ -289,7 +307,7 @@ public class RPCServer extends Thread implements RPCProtocol {
 				String hostPort = task.getHostPort();
 				builder.add(hostPort);
 			}
-			map.put(taskType, builder);
+			map.put(jobName, builder);
 		}
 		ObjectMapper objectMapper = new ObjectMapper();
 		return objectMapper.writeValueAsString(map);
@@ -316,9 +334,9 @@ public class RPCServer extends Thread implements RPCProtocol {
 	}
 
 	@Override
-	public String registerExecutionResult(int exitCode, String taskType, String taskIndex) throws Exception {
-		LOG.info("Received result registration request with exit code " + exitCode + " from " + taskType + " " + taskIndex);
-		MeLoN_Task task = getTask(taskType, taskIndex);
+	public String registerExecutionResult(int exitCode, String jobName, String taskIndex) throws Exception {
+		LOG.info("Received result registration request with exit code " + exitCode + " from " + jobName + " " + taskIndex);
+		MeLoN_Task task = getTask(jobName, taskIndex);
 		return "RECEIVED";
 	}
 
