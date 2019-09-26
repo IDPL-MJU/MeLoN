@@ -63,104 +63,110 @@ import kr.ac.mju.idpl.melon.MeLoN_Client;
 
 public class MeLoN_Client {
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_Client.class);
-	private YarnConfiguration yarnConf;
+
+	// Configurations
 	private YarnClient yarnClient;
-	private ApplicationId appId;
-	private FileSystem fs;
-
-	private String melonFinalConfPath;
-	private Configuration melonConf;
+	private YarnConfiguration yarnConf;
 	private Configuration hdfsConf;
-
-	private String appName;
 	private Options opts;
-	//private String appJar = "";
 
+	// Containers setup
 	private String hdfsConfAddress = null;
 	private String yarnConfAddress = null;
-	private Map<String, String> shellEnvs = new HashMap<>();
-	private Map<String, String> containerEnvs = new HashMap<>();
-	private Path appResourcesPath;
-
-	private final String melonAMClass = MeLoN_ApplicationMaster.class.getName();
-	//private int amPriority;
-	private String amQueue = "";
-	private int amVCores;
+	private String appName;
+	private ApplicationId appId;
 	private long amMemory;
+	private int amVCores;
 	private int amGpus;
-
 	private String taskParams = null;
 	private String pythonBinaryPath = null;
 	private String pythonVenv = null;
 	private String executes = null;
 	private String srcDir = null;
+	private String melonJarPath = null;
+	private Configuration melonConf;
+	private String melonFinalConfPath;
+	private Map<String, String> shellEnvs = new HashMap<>();
+	private Map<String, String> containerEnvs = new HashMap<>();
+	private Path appResourcesPath;
 
-	//private String adminId;
-	//private String adminPwd;
+	private FileSystem fs;
+
+	private final String melonAMClass = MeLoN_ApplicationMaster.class.getName();
+	// private int amPriority;
+	private String amQueue = "";
+
 	private String appUri;
 
 	public MeLoN_Client() {
+		initOptions();
 		yarnConf = new YarnConfiguration();
 		hdfsConf = new Configuration();
 		melonConf = new Configuration(false);
 		yarnClient = YarnClient.createYarnClient();
-		initOptions();
 	}
 
 	private void initHdfsConf() {
-		if (hdfsConfAddress != null) {
-			hdfsConf.addResource(new Path(hdfsConfAddress));
-		} else if (System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) != null) {
+		LOG.info("Initializing HDFS configurations...");
+		if (System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) != null) {
 			hdfsConf.addResource(new Path(System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) + File.separatorChar
 					+ MeLoN_Constants.CORE_SITE_CONF));
 			hdfsConf.addResource(new Path(System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) + File.separatorChar
 					+ MeLoN_Constants.HDFS_SITE_CONF));
 		}
+		if (hdfsConfAddress != null) {
+			hdfsConf.addResource(new Path(hdfsConfAddress));
+		}
+		LOG.info("Finished init HDFS configurations...");
 	}
 
 	private void initYarnConf() {
-		if (this.yarnConfAddress != null) {
-			this.yarnConf.addResource(new Path(this.yarnConfAddress));
-		} else if (System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) != null) {
+		LOG.info("Initializing YARN configurations...");
+		if (System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) != null) {
 			yarnConf.addResource(new Path(System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) + File.separatorChar
 					+ MeLoN_Constants.CORE_SITE_CONF));
 			yarnConf.addResource(new Path(System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) + File.separatorChar
 					+ MeLoN_Constants.YARN_SITE_CONF));
 		}
+		if (yarnConfAddress != null) {
+			yarnConf.addResource(new Path(this.yarnConfAddress));
+		} 
+		LOG.info("Finished init YARN configurations...");
 	}
 
 	private void initOptions() {
 		opts = new Options();
-		// opts.addOption("appName", true, "Application Name. Default value - MeLoN");
+		// opts.addOption("appName", true, "Application Name. Default value - melon");
 		// opts.addOption("priority", true, "Application Priority. Default value - 0");
 		// opts.addOption("hdfs_classpath", true, "Path to jars on HDFS for workers.");
-		opts.addOption("python_bin_path", true, "The relative path to python binary.");
-		opts.addOption("python_venv", true, "The python virtual environment zip.");
-		//opts.addOption("jar", true, "JAR file containing the application master. Default - ./MeLoN.jar");
+		opts.addOption("python_venv", true, "The python virtual environment zip. Default : venv.zip");
+		opts.addOption("python_bin_path", true, "The relative path to python binary. Default : Python/bin/python");
+		opts.addOption("executes", true, "The file to execute on containers.");
 		opts.addOption("task_params", true, "The task params to pass into python entry point.");
 		opts.addOption("shell_env", true, "Environment for shell script, specified as env_key=env_val pairs");
 		opts.addOption("conf", true, "User specified configuration, as key=val pairs");
-		opts.addOption("conf_file", true, "Name of user specified conf file, on the classpath");
-		opts.addOption("executes", true, "The file to execute on containers.");
-		opts.addOption("src_dir", true, "Name of directory of source files.");
+		opts.addOption("conf_file", true, "Name of user specified conf file, on the classpath. Default : melon.xml");
+		opts.addOption("src_dir", true, "Name of directory of source files. Default : src");
+		opts.addOption("jar", true, "JAR file containing the application master. Default : melon.jar");
 		opts.addOption("help", false, "Print usage.");
 	}
 
 	private void initMelonConf(CommandLine cliParser) throws IOException {
-		melonConf.addResource("melon-default.xml");
+		LOG.info("Starting init melon configurations");
+		LOG.info("Initializing from a default configuration file. 'melon-default.xml'");
+		this.melonConf.addResource("melon-default.xml");
 		if (cliParser.hasOption("conf_file")) {
+			// assume local file only
 			Path confFilePath = new Path(cliParser.getOptionValue("conf_file"));
-
-			if (confFilePath.toUri().getScheme() == null) {
-				melonConf.addResource(confFilePath);
-			} else {
-				melonConf.addResource(confFilePath.getFileSystem(yarnConf).open(confFilePath));
-			}
+			LOG.info("Adding " + confFilePath + " to melon configurations.");
+			melonConf.addResource(confFilePath);
 		} else {
+			LOG.info("Adding " + "melon.xml" + " to melon configurations.");
 			melonConf.addResource("melon.xml");
 		}
 
 		if (cliParser.hasOption("conf")) {
+			LOG.info("Adding a 'conf' option value(KeyValuePair) to melon configurations.");
 			String[] cliConfs = cliParser.getOptionValues("conf");
 			for (Map.Entry<String, String> cliConf : Utils.parseKeyValue(cliConfs).entrySet()) {
 				String[] alreadySetConf = melonConf.getStrings(cliConf.getKey());
@@ -173,42 +179,38 @@ public class MeLoN_Client {
 				}
 			}
 		}
+		LOG.info("Finished initializing melon configurations");
 	}
 
 	public boolean init(String[] args) throws ParseException, IOException {
-		LOG.info("Starting init...");
+		LOG.info("Starting init MeLoN_Clinet...");
 		CommandLine cliParser = new GnuParser().parse(opts, args);
-		if (args.length == 0) {
-			throw new IllegalArgumentException("No args specified for client to initialize.");
-		}
 		if (cliParser.hasOption("help")) {
 			printUsage();
 			return false;
 		}
 		initMelonConf(cliParser);
+		
 		hdfsConfAddress = melonConf.get(MeLoN_ConfigurationKeys.HDFS_CONF_PATH);
 		yarnConfAddress = melonConf.get(MeLoN_ConfigurationKeys.YARN_CONF_PATH);
 		initHdfsConf();
 		initYarnConf();
 		yarnClient.init(yarnConf);
+		LOG.info("Finished init yarn configuration to YarnClient.");
 
 		String amMemoryString = melonConf.get(MeLoN_ConfigurationKeys.AM_MEMORY,
 				MeLoN_ConfigurationKeys.AM_MEMORY_DEFAULT);
 		amMemory = Integer.parseInt(Utils.parseMemoryString(amMemoryString));
 		amVCores = melonConf.getInt(MeLoN_ConfigurationKeys.AM_VCORES, MeLoN_ConfigurationKeys.AM_VCORES_DEFAULT);
 		amGpus = melonConf.getInt(MeLoN_ConfigurationKeys.AM_GPUS, MeLoN_ConfigurationKeys.AM_GPUS_DEFAULT);
-
-		pythonBinaryPath = cliParser.getOptionValue("python_bin_path");
-		pythonVenv = cliParser.getOptionValue("python_venv");
+		pythonBinaryPath = cliParser.getOptionValue("python_bin_path", "Python/bin/python");
+		pythonVenv = cliParser.getOptionValue("python_venv", "venv.zip");
 		taskParams = cliParser.getOptionValue("task_params");
 		executes = buildTaskCommand(pythonBinaryPath, pythonVenv, cliParser.getOptionValue("executes"), taskParams);
 		melonConf.set(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND, executes);
 
-		srcDir = cliParser.getOptionValue("src_dir");
-		if (!cliParser.hasOption("jar")) {
-			throw new IllegalArgumentException("No jar file specified for application master");
-		}
-		//appJar = cliParser.getOptionValue("jar");
+		srcDir = cliParser.getOptionValue("src_dir", "src");
+		melonJarPath = cliParser.getOptionValue("jar", "melon.jar");
 
 		if (amMemory < 0) {
 			throw new IllegalArgumentException(
@@ -218,40 +220,48 @@ public class MeLoN_Client {
 			throw new IllegalArgumentException("Invalid virtual cores specified for application master, exiting."
 					+ " Specified virtual cores=" + amVCores);
 		}
+		LOG.info("...?");
 		if (Utils.getNumTotalTasks(melonConf) == 0 && amGpus > 0) {
 			LOG.warn("It seems you reserved " + amGpus
 					+ " GPUs in application master (driver, which doesn't perform training) during distributed training.");
 		}
+		LOG.info("...?");
 
+		List<String> shellEnvsPair = new ArrayList<>();
 		if (melonConf.get(MeLoN_ConfigurationKeys.SHELL_ENVS) != null) {
 			String[] envs = melonConf.getStrings(MeLoN_ConfigurationKeys.SHELL_ENVS);
+			shellEnvsPair.addAll(Arrays.asList(envs));
 			shellEnvs.putAll(Utils.parseKeyValue(envs));
 		}
 		if (cliParser.hasOption("shell_envs")) {
 			String[] envs = cliParser.getOptionValues("shell_envs");
+			shellEnvsPair.addAll(Arrays.asList(envs));
 			shellEnvs.putAll(Utils.parseKeyValue(envs));
 		}
 		if (!shellEnvs.isEmpty()) {
-			melonConf.setStrings(MeLoN_ConfigurationKeys.SHELL_ENVS, shellEnvs.entrySet().toArray(new String[0]));
+			melonConf.setStrings(MeLoN_ConfigurationKeys.SHELL_ENVS, shellEnvsPair.toArray(new String[0]));
 		}
 
+		List<String> containerEnvsPair = new ArrayList<>();
 		if (melonConf.get(MeLoN_ConfigurationKeys.CONTAINER_ENVS) != null) {
 			String[] envs = melonConf.getStrings(MeLoN_ConfigurationKeys.CONTAINER_ENVS);
+			containerEnvsPair.addAll(Arrays.asList(envs));
 			containerEnvs.putAll(Utils.parseKeyValue(envs));
 		}
 		if (cliParser.hasOption("container_envs")) {
 			String[] envs = cliParser.getOptionValues("container_envs");
+			containerEnvsPair.addAll(Arrays.asList(envs));
 			containerEnvs.putAll(Utils.parseKeyValue(envs));
 		}
 		if (!containerEnvs.isEmpty()) {
-			melonConf.setStrings(MeLoN_ConfigurationKeys.CONTAINER_ENVS,
-					containerEnvs.entrySet().toArray(new String[0]));
+			melonConf.setStrings(MeLoN_ConfigurationKeys.CONTAINER_ENVS, containerEnvsPair.toArray(new String[0]));
 		}
-
+		LOG.info("Finished MeLoN_Client's init");
 		return true;
 	}
 
 	public String buildTaskCommand(String pythonVenv, String pythonBinaryPath, String executes, String taskParams) {
+		LOG.info("Building a container task command.");
 		if (executes != null) {
 			String containerCmd = executes;
 			String pythonInterpreter;
@@ -266,19 +276,23 @@ public class MeLoN_Client {
 			if (taskParams != null) {
 				containerCmd += "" + taskParams;
 			}
+			LOG.info("The container task command was builded. [ " + containerCmd + " ]");
 			return containerCmd;
 		} else {
+			LOG.info("The container task command wasn't builded. (There is no option value 'executes' in the command line.");
 			return null;
 		}
 	}
 
 	private void addToLocalResource(String srcPath, FileSystem fs, String dstPath, LocalResourceType resourceType,
 			Map<String, LocalResource> localResources) throws IOException {
+		LOG.info("Copying [" + srcPath + "] to [" + dstPath + "]...");
 		Path src = new Path(srcPath);
 		Path dst = new Path(appResourcesPath, dstPath);
 		fs.copyFromLocalFile(false, true, src, dst);
 		FileStatus dstFileStatus = fs.getFileStatus(dst);
 		fs.setPermission(dst, new FsPermission((short) 0770));
+		LOG.info("Copied [" + dstPath + "] to " + "[" + dst + "]");
 
 		LocalResource lr = LocalResource.newInstance(ConverterUtils.getYarnUrlFromURI(dst.toUri()), // setResource
 				resourceType, // setType
@@ -286,11 +300,13 @@ public class MeLoN_Client {
 				dstFileStatus.getLen(), // setSize
 				dstFileStatus.getModificationTime()); // setTimestamp
 
+		LOG.info("Adding [" + dstPath + "] to LocalResources.");
 		localResources.put(dstPath, lr);
 	}
 
 	private void uploadFileAndSetConfResources(Path src, FileSystem fs, Path hdfsPath, String fileName,
 			LocalResourceType resourceType, String resourcecKey, Configuration melonConf) throws IOException {
+		LOG.info("Uploading resource files and Updating the resource list in melon configurations.");
 		Path dst = new Path(hdfsPath, fileName);
 		fs.copyFromLocalFile(false, true, src, dst);
 		fs.setPermission(dst, new FsPermission((short) 0770));
@@ -308,8 +324,6 @@ public class MeLoN_Client {
 			melonConf.setStrings(resourcecKey, updatedResources.toArray(new String[0]));
 		}
 	}
-
-	
 
 	public int run() throws IOException, YarnException, ParseException {
 		LOG.info("Starting YarnClient...");
@@ -330,14 +344,18 @@ public class MeLoN_Client {
 		}
 
 		fs = FileSystem.get(hdfsConf);
+		ApplicationSubmissionContext appContext = app.getApplicationSubmissionContext();
 		appName = melonConf.get(MeLoN_ConfigurationKeys.APPLICATION_NAME,
 				MeLoN_ConfigurationKeys.APPLICATION_NAME_DEFAULT);
-		ApplicationSubmissionContext appContext = app.getApplicationSubmissionContext();
+		appContext.setApplicationName(appName);
 		appId = appContext.getApplicationId();
+		
+		amQueue = melonConf.get(MeLoN_ConfigurationKeys.YARN_QUEUE_NAME, MeLoN_ConfigurationKeys.YARN_QUEUE_NAME_DEFAULT);
+		appContext.setQueue(amQueue);
+		
 		appResourcesPath = new Path(fs.getHomeDirectory(), appName + File.separator + appId.toString());
 
-		this.melonFinalConfPath = processMelonFinalConf();
-		appContext.setApplicationName(appName);
+		melonFinalConfPath = processMelonFinalConf();
 
 		Resource capability = Resource.newInstance((int) amMemory, amVCores);
 		Utils.setCapabilityGPU(capability, amGpus);
@@ -349,7 +367,7 @@ public class MeLoN_Client {
 		Map<String, LocalResource> localResources = new HashMap<>();
 		addToLocalResource(melonFinalConfPath, fs, MeLoN_Constants.MELON_FINAL_XML, LocalResourceType.FILE,
 				localResources);
-		// addResource(appJar, fs, "appJar", LocalResourceType.FILE, localResources);
+		addToLocalResource(melonJarPath, fs, MeLoN_Constants.MELON_JAR, LocalResourceType.FILE, localResources);
 
 		String[] amResources = melonConf.getStrings(MeLoN_ConfigurationKeys.getResourcesKey(MeLoN_Constants.AM_NAME));
 		Utils.addResources(amResources, localResources, fs);
@@ -363,8 +381,8 @@ public class MeLoN_Client {
 		amContainer.setCommands(buildAMCommand());
 
 		appContext.setAMContainerSpec(amContainer);
-		
-	    LOG.info("Submitting YARN application");
+
+		LOG.info("Submitting YARN application" + "["+ appId + "]");
 		yarnClient.submitApplication(appContext);
 		// ApplicationReport report = yarnClient.getApplicationReport(appId);
 
@@ -376,7 +394,6 @@ public class MeLoN_Client {
 		vargs.add(ApplicationConstants.Environment.JAVA_HOME.$$() + "/bin/java");
 		vargs.add("-Xmx" + (int) amMemory + "m");
 		vargs.add(melonAMClass);
-		vargs.add("--jar" + appUri);
 		vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + File.separatorChar
 				+ "/MeLoN_ApplicationMaster.stdout");
 		vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + File.separatorChar
@@ -399,11 +416,9 @@ public class MeLoN_Client {
 		containerEnvs.put(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.TIMESTAMP_SUFFIX,
 				Long.toString(rsrcTimestamp));
 
-		// Setting all required classpaths including the classpath to "." for the app
-		// jar
-		StringBuilder classPathEnv = new StringBuilder(ApplicationConstants.Environment.CLASSPATH.$$())
+		// Setting all required classpaths including the classpath to "." for the app jar
+		StringBuilder classPathEnv = new StringBuilder(ApplicationConstants.Environment.CLASSPATH.$())
 				.append(ApplicationConstants.CLASS_PATH_SEPARATOR).append("./*");
-
 		for (String c : yarnConf.getStrings(YarnConfiguration.YARN_APPLICATION_CLASSPATH,
 				YarnConfiguration.DEFAULT_YARN_APPLICATION_CLASSPATH)) {
 			classPathEnv.append(ApplicationConstants.CLASS_PATH_SEPARATOR);
@@ -415,18 +430,21 @@ public class MeLoN_Client {
 	private String processMelonFinalConf() throws IOException, ParseException {
 		FileSystem fs = FileSystem.get(hdfsConf);
 		if (srcDir != null) {
+			LOG.info("Uploading src directory ...");
 			if (Utils.isArchive(srcDir)) {
 				uploadFileAndSetConfResources(new Path(srcDir), fs, appResourcesPath,
 						MeLoN_Constants.MELON_SRC_ZIP_NAME, LocalResourceType.FILE,
 						MeLoN_ConfigurationKeys.CONTAINER_RESOURCES, melonConf);
 			} else {
+				LOG.info("Zipping the src directory to upload ...");
 				zipFolder(Paths.get(srcDir), Paths.get(MeLoN_Constants.MELON_SRC_ZIP_NAME));
-				uploadFileAndSetConfResources(new Path(srcDir), fs, appResourcesPath,
+				uploadFileAndSetConfResources(new Path(MeLoN_Constants.MELON_SRC_ZIP_NAME), fs, appResourcesPath,
 						MeLoN_Constants.MELON_SRC_ZIP_NAME, LocalResourceType.FILE,
 						MeLoN_ConfigurationKeys.CONTAINER_RESOURCES, melonConf);
 			}
 		}
 		if (pythonVenv != null) {
+			LOG.info("Uploading a python venv zip file ...");
 			uploadFileAndSetConfResources(new Path(pythonVenv), fs, appResourcesPath, MeLoN_Constants.PYTHON_VENV_ZIP,
 					LocalResourceType.FILE, MeLoN_ConfigurationKeys.CONTAINER_RESOURCES, melonConf);
 		}
@@ -449,6 +467,7 @@ public class MeLoN_Client {
 	}
 
 	private void processConfResources(Configuration melonConf, FileSystem fs) throws IOException, ParseException {
+		LOG.info("Processing resource configurations ...");
 		Set<String> resourceKeys = melonConf.getValByRegex(MeLoN_ConfigurationKeys.RESOURCES_REGEX).keySet();
 		for (String resourceKey : resourceKeys) {
 			String[] resources = melonConf.getStrings(resourceKey);
@@ -487,9 +506,9 @@ public class MeLoN_Client {
 						} finally {
 							try {
 								FileUtils.deleteDirectory(tmpDir);
-							} catch (IOException ex) {
+							} catch (IOException e) {
 								// ignore the deletion failure and continue
-								LOG.warn("Failed to delete temp directory " + tmpDir, ex);
+								LOG.warn("Failed to delete temp directory " + tmpDir, e);
 							}
 						}
 					}
@@ -558,7 +577,7 @@ public class MeLoN_Client {
 					LOG.info("Application has completed successfully. Breaking monitoring loop.");
 					return 0;
 				} else {
-					LOG.info("Application did finished unsuccessfully." + "YarnState=" + appState.toString()
+					LOG.info("Application finished unsuccessfully." + "YarnState=" + appState.toString()
 							+ ", FinalStatus=" + finalApplicationStatus.toString() + ". Breaking monitoring loop.");
 					return -1;
 				}
@@ -575,22 +594,17 @@ public class MeLoN_Client {
 	}
 
 	public static void main(String[] args) {
-		int exitCode = 0;
+		int exitCode = -1;
 		try {
 			MeLoN_Client client = new MeLoN_Client();
-			try {
-				boolean doInit = client.init(args);
-				if (!doInit) {
-					LOG.error("Failed to init MeLoN_Client.");
-					exitCode = -1;
-				}
-			} catch (IllegalArgumentException e) {
-				client.printUsage();
+			boolean doInit = client.init(args);
+			if (!doInit) {
+				LOG.error("Failed to init MeLoN_Client.");
 				exitCode = -1;
 			}
 			exitCode = client.run();
 		} catch (Throwable t) {
-			LOG.error("Failed to finish MeLoN_Client seccessfully.");
+			LOG.error("Failed to finish MeLoN_Client seccessfully. with (" + t + ")");
 			exitCode = -1;
 		}
 		if (exitCode == 0) {

@@ -15,6 +15,7 @@ public class MeLoN_Constants {
 
 	public static final String PYTHON_VENV_DIR = "venv";
 
+	public static final String MELON_JAR = "melon.jar";
 	public static final String MELON_FINAL_XML = "melon-final.xml";
 	public static final String MELON_SRC_ZIP_NAME = "melon_src.zip";
 	public static final String PYTHON_VENV_ZIP = "venv.zip";

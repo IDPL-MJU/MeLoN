@@ -246,12 +246,18 @@ public class RPCServer extends Thread implements RPCProtocol {
 	}
 
 	public void run() {
+		LOG.info("Running RPCServer ...");
 		try {
-			server = new RPC.Builder(yarnConf).setProtocol(RPCProtocol.class).setInstance(this)
-					.setBindAddress(rpcAddress).setPort(rpcPort).build();
+			LOG.info("Building RPCServer ...");
+			server = new RPC.Builder(yarnConf)
+					.setProtocol(RPCProtocol.class)
+					.setInstance(this)
+					.setBindAddress(rpcAddress)
+					.setPort(rpcPort).build();
+			LOG.info("Starting RPCServer ...");
 			server.start();
 		} catch (Exception e) {
-			throw new RuntimeException();
+			throw new RuntimeException(e);
 		}
 	}
 

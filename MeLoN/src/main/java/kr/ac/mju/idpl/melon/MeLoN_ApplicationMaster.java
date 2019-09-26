@@ -107,7 +107,7 @@ public class MeLoN_ApplicationMaster {
 
 	private void initOptions() {
 		opts.addOption("hdfs_classpath", true, "Path to jars on HDFS for workers.");
-		opts.addOption("python_binary_path", true, "The relative path to python binary.");
+		opts.addOption("python_bin_path", true, "The relative path to python binary.");
 		opts.addOption("python_venv", true, "The python virtual environment zip.");
 	}
 
@@ -172,9 +172,12 @@ public class MeLoN_ApplicationMaster {
 		nmClientAsync.init(yarnConf);
 		nmClientAsync.start();
 		LOG.info("Starting NMCallbackHandler...");
-
+		
+		LOG.info("Starting application RPC server at: " + amHostname + ":" + amPort);
 		rpcServer.start();
+		LOG.info("RPCServer set resources");
 		rpcServer.setResources(yarnConf, hdfsConf, localResources, containerEnvs, hdfsClasspath);
+		LOG.info("Listing requests");
 		List<MeLoN_ContainerRequest> requests = rpcServer.getContainerRequests();
 		for (MeLoN_ContainerRequest request : requests) {
 			ContainerRequest containerAsk = setupContainerAskForRM(request);

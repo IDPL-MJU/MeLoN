@@ -244,7 +244,7 @@ public class Utils {
 	}
 
 	public static String[] getUntrackedJobTypes(Configuration conf) {
-		return conf.getStrings(MeLoN_ConfigurationKeys.UNTRACKED_JOBTYPES,
-				MeLoN_ConfigurationKeys.UNTRACKED_JOBTYPES_DEFAULT);
+		return conf.getStrings(MeLoN_ConfigurationKeys.UNTRACKED_TASKTYPES,
+				MeLoN_ConfigurationKeys.UNTRACKED_TASKTYPES_DEFAULT);
 	}
 }
