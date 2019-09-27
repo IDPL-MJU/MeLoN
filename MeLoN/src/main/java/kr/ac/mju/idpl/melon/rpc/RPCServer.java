@@ -22,6 +22,7 @@ import org.apache.hadoop.ipc.RPC.Server;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 import org.apache.hadoop.yarn.api.records.FinalApplicationStatus;
 import org.apache.hadoop.yarn.api.records.LocalResource;
@@ -34,6 +35,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.base.Preconditions;
 
 import kr.ac.mju.idpl.melon.MeLoN_Constants;
 import kr.ac.mju.idpl.melon.MeLoN_ContainerRequest;
@@ -69,7 +71,8 @@ public class RPCServer extends Thread implements RPCProtocol {
 		this.jvmArgs = builder.jvmArgs;
 		this.containerRequests = Utils.parseContainerRequests(builder.melonConf);
 		for (Map.Entry<String, MeLoN_ContainerRequest> entry : containerRequests.entrySet()) {
-			LOG.info("jobtasks put request : " + entry.getValue().getJobName() + " - mem:" + entry.getValue().getMemory() + ", vcores:" + entry.getValue().getvCores());
+			LOG.info("jobtasks put request : " + entry.getValue().getJobName() + " - mem:"
+					+ entry.getValue().getMemory() + ", vcores:" + entry.getValue().getvCores());
 			jobTasks.put(entry.getKey(), new MeLoN_Task[entry.getValue().getNumInstances()]);
 		}
 		this.melonConf = builder.melonConf;
@@ -115,6 +118,21 @@ public class RPCServer extends Thread implements RPCProtocol {
 			}
 		}
 		return null;
+	}
+
+	public void onTaskCompleted(String jobName, String jobIndex, int exitCode) {
+		LOG.info("Job {}:{} finished with exitCode: {}", jobName, jobIndex, exitCode);
+		MeLoN_Task task = getTask(jobName, jobIndex);
+		Preconditions.checkNotNull(task);
+		task.setExitStatus(exitCode);
+		if (exitCode != ContainerExitStatus.SUCCESS && exitCode != ContainerExitStatus.KILLED_BY_APPMASTER) {
+			trainingFinished = true;
+			setTrainingFinalStatus(FinalApplicationStatus.FAILED);
+		}
+	}
+
+	public void setTrainingFinalStatus(FinalApplicationStatus trainingFinalStatus) {
+		this.trainingFinalStatus = trainingFinalStatus;
 	}
 
 	public void updateTrainingFinalStatus() {
@@ -185,13 +203,12 @@ public class RPCServer extends Thread implements RPCProtocol {
 				ConverterUtils.getYarnUrlFromURI(URI.create(melonConfPath)), LocalResourceType.FILE,
 				LocalResourceVisibility.PRIVATE, melonConfLength, melonConfTimestamp);
 		localResources.put(MeLoN_Constants.MELON_FINAL_XML, melonConfResource);
-		
+
 		String melonJarPath = env.get(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.PATH_SUFFIX);
 		LOG.info("melonJarPath : " + melonJarPath);
 		long melonJarTimestamp = Long
 				.parseLong(env.get(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.TIMESTAMP_SUFFIX));
-		long melonJarLength = Long
-				.parseLong(env.get(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.LENGTH_SUFFIX));
+		long melonJarLength = Long.parseLong(env.get(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.LENGTH_SUFFIX));
 
 		LocalResource melonJarResource = LocalResource.newInstance(
 				ConverterUtils.getYarnUrlFromURI(URI.create(melonJarPath)), LocalResourceType.FILE,
@@ -258,6 +275,10 @@ public class RPCServer extends Thread implements RPCProtocol {
 		}
 		return null;
 	}
+	
+	public MeLoN_Task getTask(ContainerId containerId) {
+		return containerIdMap.get(containerId);
+	}
 
 	public void addContainer(ContainerId containerId, MeLoN_Task task) {
 		containerIdMap.put(containerId, task);
@@ -267,11 +288,8 @@ public class RPCServer extends Thread implements RPCProtocol {
 		LOG.info("Running RPCServer ...");
 		try {
 			LOG.info("Building RPCServer ...");
-			server = new RPC.Builder(yarnConf)
-					.setProtocol(RPCProtocol.class)
-					.setInstance(this)
-					.setBindAddress(rpcAddress)
-					.setPort(rpcPort).build();
+			server = new RPC.Builder(yarnConf).setProtocol(RPCProtocol.class).setInstance(this)
+					.setBindAddress(rpcAddress).setPort(rpcPort).build();
 			LOG.info("Starting RPCServer ...");
 			server.start();
 		} catch (Exception e) {
@@ -335,7 +353,8 @@ public class RPCServer extends Thread implements RPCProtocol {
 
 	@Override
 	public String registerExecutionResult(int exitCode, String jobName, String taskIndex) throws Exception {
-		LOG.info("Received result registration request with exit code " + exitCode + " from " + jobName + " " + taskIndex);
+		LOG.info("Received result registration request with exit code " + exitCode + " from " + jobName + " "
+				+ taskIndex);
 		MeLoN_Task task = getTask(jobName, taskIndex);
 		return "RECEIVED";
 	}

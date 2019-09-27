@@ -260,6 +260,7 @@ public class MeLoN_ApplicationMaster {
 		@Override
 		public void onContainerStopped(ContainerId containerId) {
 			LOG.info("Container {} finished with exitStatus {}.", containerId, ContainerExitStatus.KILLED_BY_APPMASTER);
+			processFinishedContainer(containerId, ContainerExitStatus.KILLED_BY_APPMASTER);
 		}
 
 		@Override
@@ -287,7 +288,8 @@ public class MeLoN_ApplicationMaster {
 		@Override
 		public float getProgress() {
 			int numTotalTrackedTasks = rpcServer.getTotalTrackedTasks();
-			return numTotalTrackedTasks > 0 ? (float) rpcServer.getNumCompletedTrackedTasks() / numTotalTrackedTasks : 0;
+			return numTotalTrackedTasks > 0 ? (float) rpcServer.getNumCompletedTrackedTasks() / numTotalTrackedTasks
+					: 0;
 		}
 
 		@Override
@@ -315,7 +317,14 @@ public class MeLoN_ApplicationMaster {
 				} else {
 					LOG.info(diagnotics);
 				}
+				processFinishedContainer(containerStatus.getContainerId(), exitStatus);
 			}
+			int numTotalTrackedTasks = rpcServer.getTotalTrackedTasks();
+			LOG.info("numTotalTrackedTasks: {}", numTotalTrackedTasks);
+			LOG.info("rpcServer.getNumCompletedTrackedTasks(): {}", rpcServer.getNumCompletedTrackedTasks());
+			float prgrs = numTotalTrackedTasks > 0 ? (float) rpcServer.getNumCompletedTrackedTasks() / numTotalTrackedTasks
+					: 0;
+			LOG.info("getProgress: {}", getProgress());
 		}
 
 		@Override
@@ -400,7 +409,23 @@ public class MeLoN_ApplicationMaster {
 			nmClientAsync.startContainerAsync(container, ctx);
 			task.setStatus(MeLoN_TaskStatus.RUNNING);
 			LOG.info("Container {} launched!", container.getId());
-
 		}
+
+	}
+
+	private void processFinishedContainer(ContainerId containerId, int exitStatus) {
+		MeLoN_Task task = rpcServer.getTask(containerId);
+		if (task != null) {
+//			// Ignore tasks from past sessions.
+//			if (task.getSessionId() != session.sessionId) {
+//				return;
+//			}
+			LOG.info("Container {} for task {}:{} finished with exitStatus: {}.", containerId, task.getJobName(), task.getTaskIndex(), exitStatus);
+			rpcServer.onTaskCompleted(task.getJobName(), task.getTaskIndex(), exitStatus);
+			
+		} else {
+			LOG.warn("No task found for container : [" + containerId + "]!");
+		}
+
 	}
 }

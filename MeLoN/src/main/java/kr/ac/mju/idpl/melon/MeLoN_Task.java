@@ -1,6 +1,7 @@
 package kr.ac.mju.idpl.melon;
 
 import org.apache.hadoop.yarn.api.records.Container;
+import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 
 public class MeLoN_Task {
 	private String jobName;
@@ -33,11 +34,11 @@ public class MeLoN_Task {
 	public Container getContainer() {
 		return container;
 	}
-	
+
 	public int getExitStatus() {
 		return exitStatus;
 	}
-	
+
 	public String getHost() {
 		return host;
 	}
@@ -60,6 +61,24 @@ public class MeLoN_Task {
 
 	public void setStatus(MeLoN_TaskStatus status) {
 		this.status = status;
+	}
+
+	public void setExitStatus(int status) {
+		if (exitStatus == -1) {
+	        this.exitStatus = status;
+	        switch (status) {
+	          case ContainerExitStatus.SUCCESS:
+	            setStatus(MeLoN_TaskStatus.SUCCEEDED);
+	            break;
+	          case ContainerExitStatus.KILLED_BY_APPMASTER:
+	            setStatus(MeLoN_TaskStatus.FINISHED);
+	            break;
+	          default:
+	            setStatus(MeLoN_TaskStatus.FAILED);
+	            break;
+	        }
+	        this.completed = true;
+		}
 	}
 
 	public void setHostPort(String hostPort) {

@@ -56,6 +56,7 @@ public class MeLoN_TaskExecutor {
 		initConfigs();
 		Utils.extractResources();
 
+		LOG.info("This container's jobName is {}", jobName);
 		InetSocketAddress addr = new InetSocketAddress(amHost, amPort);
 		try {
 			amClient = RPC.getProxy(RPCProtocol.class, RPCProtocol.versionID, addr, yarnConf);

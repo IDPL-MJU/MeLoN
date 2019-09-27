@@ -100,7 +100,6 @@ public class Utils {
 	public static void addResource(String resource, Map<String, LocalResource> localResources, FileSystem fs) {
 		try {
 			if (resource != null) {
-				LOG.info("***Resource is not null!!!!!" + resource);
 				// Check the format of the path, if the path is of path#archive, we set resource
 				// type as ARCHIVE
 				LocalizableResource lr = new LocalizableResource(resource, fs);
@@ -194,12 +193,9 @@ public class Utils {
 
 	public static Map<String, MeLoN_ContainerRequest> parseContainerRequests(Configuration conf) {
 		Set<String> jobNames = getAllJobNames(conf);
-		LOG.info("***conf : " + conf.getValByRegex("melon\\.([a-z]+)\\.([a-z]+)"));
-		LOG.info("***jobNames : " + jobNames.toString());
 		Map<String, MeLoN_ContainerRequest> containerRequests = new HashMap<>();
 		int priority = 0;
 		for (String jobName : jobNames) {
-			LOG.info("***loop... jobName : " + jobName);
 			int numInstances = conf.getInt("melon." + jobName + ".instances", 0);
 			String memoryString = conf.get("melon." + jobName + ".memory", "2g");
 			long memory = Long.parseLong(parseMemoryString(memoryString));
@@ -220,7 +216,6 @@ public class Utils {
 				priority++;
 			}
 		}
-		LOG.info("***containerRequest: " + containerRequests.toString());
 		return containerRequests;
 	}
 

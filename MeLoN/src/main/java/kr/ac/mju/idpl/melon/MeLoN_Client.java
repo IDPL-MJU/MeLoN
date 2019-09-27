@@ -78,6 +78,7 @@ public class MeLoN_Client {
 	private long amMemory;
 	private int amVCores;
 	private int amGpus;
+	private String dist_shell = null;
 	private String taskParams = null;
 	private String pythonBinaryPath = null;
 	private String pythonVenv = null;
@@ -139,6 +140,7 @@ public class MeLoN_Client {
 		// opts.addOption("appName", true, "Application Name. Default value - melon");
 		// opts.addOption("priority", true, "Application Priority. Default value - 0");
 		// opts.addOption("hdfs_classpath", true, "Path to jars on HDFS for workers.");
+		opts.addOption("dist_shell", true, "The distributed shell commnad for all container.");
 		opts.addOption("python_venv", true, "The python virtual environment zip. Default : venv.zip");
 		opts.addOption("python_bin_path", true, "The relative path to python binary. Default : Python/bin/python");
 		opts.addOption("executes", true, "The file to execute on containers.");
@@ -202,10 +204,11 @@ public class MeLoN_Client {
 		amMemory = Integer.parseInt(Utils.parseMemoryString(amMemoryString));
 		amVCores = melonConf.getInt(MeLoN_ConfigurationKeys.AM_VCORES, MeLoN_ConfigurationKeys.AM_VCORES_DEFAULT);
 		amGpus = melonConf.getInt(MeLoN_ConfigurationKeys.AM_GPUS, MeLoN_ConfigurationKeys.AM_GPUS_DEFAULT);
-		pythonBinaryPath = cliParser.getOptionValue("python_bin_path", "Python/bin/python");
+		pythonBinaryPath = cliParser.getOptionValue("python_bin_path", "bin/python");
 		pythonVenv = cliParser.getOptionValue("python_venv", "venv.zip");
 		taskParams = cliParser.getOptionValue("task_params");
 		executes = buildTaskCommand(pythonVenv, pythonBinaryPath, cliParser.getOptionValue("executes"), taskParams);
+		//dist_shell = cliParser.getOptionValue("dist_shell");
 		melonConf.set(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND, executes);
 
 		srcDir = cliParser.getOptionValue("src_dir", "src");
@@ -274,6 +277,8 @@ public class MeLoN_Client {
 			}
 			LOG.info("The container task command was builded. [ " + containerCmd + " ]");
 			return containerCmd;
+		} else if(dist_shell != null){
+			return dist_shell;
 		} else {
 			LOG.info("The container task command wasn't builded. (There is no option value 'executes' in the command line.");
 			return null;
