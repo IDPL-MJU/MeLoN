@@ -57,7 +57,8 @@ public class MeLoN_ApplicationMaster {
 	private AMRMClientAsync<ContainerRequest> amRMClient;
 	private NMClientAsync nmClientAsync;
 	private NMCallbackHandler containerListener;
-
+	
+	private List<Container> runningContainers = new ArrayList<>();
 	// private ApplicationAttemptId appAttemptID;
 
 	private String amHostname = "";
@@ -147,7 +148,7 @@ public class MeLoN_ApplicationMaster {
 
 	}
 
-	private boolean run(String[] args) throws IOException, YarnException {
+	private boolean run(String[] args) throws IOException, YarnException, InterruptedException {
 		long started = System.currentTimeMillis();
 		if (!init(args)) {
 			return false;
@@ -201,6 +202,13 @@ public class MeLoN_ApplicationMaster {
 			LOG.info("done");
 		}
 		while (!done) {
+			int numTotalTrackedTasks = rpcServer.getTotalTrackedTasks();
+			if ((numTotalTrackedTasks > 0 ? (float) rpcServer.getNumCompletedTrackedTasks() / numTotalTrackedTasks
+					: 0) == 1.0f) {
+				stopRunningContainers();
+				LOG.info("Training has finished.");
+				break;
+			}
 			if (rpcServer.isTrainingFinished()) {
 				LOG.info("Training has finished.");
 				break;
@@ -213,6 +221,9 @@ public class MeLoN_ApplicationMaster {
 				LOG.error("Thread interrupted", e);
 			}
 		}
+		nmClientAsync.stop();
+		amRMClient.unregisterApplicationMaster(FinalApplicationStatus.SUCCEEDED, "Application complete!", null);
+		amRMClient.stop();
 		rpcServer.updateTrainingFinalStatus();
 		FinalApplicationStatus status = rpcServer.getTrainingFinalStatus();
 		if (status != FinalApplicationStatus.SUCCEEDED) {
@@ -221,6 +232,26 @@ public class MeLoN_ApplicationMaster {
 			LOG.info("Training finished successfully!");
 		}
 		return status == FinalApplicationStatus.SUCCEEDED;
+	}
+
+	private void stopRunningContainers() throws InterruptedException {
+		//List<Container> allContainers = sessionContainersMap.get(session.sessionId);
+		if (runningContainers != null) {
+			for (Container container : runningContainers) {
+				MeLoN_Task task = rpcServer.getTask(container.getId());
+				if (!task.isCompleted()) {
+					nmClientAsync.stopContainerAsync(container.getId(), container.getNodeId());
+				}
+			}
+		}
+
+		// Give 15 seconds for containers to exit
+		Thread.sleep(15000);
+		boolean result = rpcServer.getNumCompletedTasks() == rpcServer.getTotalTasks();
+		if (!result) {
+			LOG.warn("Not all containers were stopped or completed. Only " + rpcServer.getNumCompletedTasks() + " out of "
+					+ rpcServer.getTotalTasks() + " finished.");
+		}
 	}
 
 	private ContainerRequest setupContainerAskForRM(MeLoN_ContainerRequest request) {
@@ -301,6 +332,7 @@ public class MeLoN_ApplicationMaster {
 						+ ", resourceRequest = " + container.getResource() + ", priority = " + container.getPriority());
 				Thread thread = new Thread(new ContainerLauncher(container));
 				thread.start();
+				runningContainers.add(container);
 			}
 		}
 
@@ -322,7 +354,8 @@ public class MeLoN_ApplicationMaster {
 			int numTotalTrackedTasks = rpcServer.getTotalTrackedTasks();
 			LOG.info("numTotalTrackedTasks: {}", numTotalTrackedTasks);
 			LOG.info("rpcServer.getNumCompletedTrackedTasks(): {}", rpcServer.getNumCompletedTrackedTasks());
-			float prgrs = numTotalTrackedTasks > 0 ? (float) rpcServer.getNumCompletedTrackedTasks() / numTotalTrackedTasks
+			float prgrs = numTotalTrackedTasks > 0
+					? (float) rpcServer.getNumCompletedTrackedTasks() / numTotalTrackedTasks
 					: 0;
 			LOG.info("getProgress: {}", getProgress());
 		}
@@ -416,13 +449,14 @@ public class MeLoN_ApplicationMaster {
 	private void processFinishedContainer(ContainerId containerId, int exitStatus) {
 		MeLoN_Task task = rpcServer.getTask(containerId);
 		if (task != null) {
-//			// Ignore tasks from past sessions.
-//			if (task.getSessionId() != session.sessionId) {
-//				return;
-//			}
-			LOG.info("Container {} for task {}:{} finished with exitStatus: {}.", containerId, task.getJobName(), task.getTaskIndex(), exitStatus);
+			// // Ignore tasks from past sessions.
+			// if (task.getSessionId() != session.sessionId) {
+			// return;
+			// }
+			LOG.info("Container {} for task {}:{} finished with exitStatus: {}.", containerId, task.getJobName(),
+					task.getTaskIndex(), exitStatus);
 			rpcServer.onTaskCompleted(task.getJobName(), task.getTaskIndex(), exitStatus);
-			
+
 		} else {
 			LOG.warn("No task found for container : [" + containerId + "]!");
 		}

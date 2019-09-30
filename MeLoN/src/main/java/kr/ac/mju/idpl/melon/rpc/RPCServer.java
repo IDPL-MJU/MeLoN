@@ -54,6 +54,7 @@ public class RPCServer extends Thread implements RPCProtocol {
 	private Server server;
 
 	// application information
+	private int sessionId;
 	private String appId;
 	private long startingTime;
 	private long finishingTime;
@@ -256,6 +257,11 @@ public class RPCServer extends Thread implements RPCProtocol {
 				.mapToInt(entry -> entry.getValue().length).sum();
 	}
 
+	public int getNumCompletedTasks() {
+		return (int) jobTasks.values().stream().flatMap(arr -> Arrays.stream(arr)).filter(task -> task.isCompleted())
+				.count();
+	}
+
 	public int getNumCompletedTrackedTasks() {
 		return (int) jobTasks.entrySet().stream().filter(entry -> Utils.isJobNameTracked(entry.getKey(), melonConf))
 				.flatMap(entry -> Arrays.stream(entry.getValue())).filter(task -> task != null && task.isCompleted())
@@ -275,7 +281,7 @@ public class RPCServer extends Thread implements RPCProtocol {
 		}
 		return null;
 	}
-	
+
 	public MeLoN_Task getTask(ContainerId containerId) {
 		return containerIdMap.get(containerId);
 	}
