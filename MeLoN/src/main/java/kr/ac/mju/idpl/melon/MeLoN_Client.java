@@ -151,6 +151,9 @@ public class MeLoN_Client {
 		opts.addOption("src_dir", true, "Name of directory of source files. Default : src");
 		opts.addOption("jar", true, "JAR file containing the application master. Default : melon.jar");
 		opts.addOption("help", false, "Print usage.");
+		
+		// for test
+		opts.addOption("askContainerTest", true, "Test for asking container to specific nodes.");
 	}
 
 	private void initMelonConf(CommandLine cliParser) throws IOException {
@@ -208,12 +211,16 @@ public class MeLoN_Client {
 		pythonVenv = cliParser.getOptionValue("python_venv", "venv.zip");
 		taskParams = cliParser.getOptionValue("task_params");
 		executes = buildTaskCommand(pythonVenv, pythonBinaryPath, cliParser.getOptionValue("executes"), taskParams);
-		//dist_shell = cliParser.getOptionValue("dist_shell");
+
+		if (cliParser.hasOption("dist_shell")) {
+			executes = cliParser.getOptionValue("dist_shell");
+		}
+		
 		melonConf.set(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND, executes);
 
 		srcDir = cliParser.getOptionValue("src_dir", "src");
 		melonJarPath = cliParser.getOptionValue("jar", "melon.jar");
-
+		
 		if (amMemory < 0) {
 			throw new IllegalArgumentException(
 					"Invalid memory specified for application master exiting." + "Specified Memory =" + amMemory);
@@ -253,6 +260,9 @@ public class MeLoN_Client {
 			containerEnvsPair.addAll(Arrays.asList(envs));
 			containerEnvs.putAll(Utils.parseKeyValue(envs));
 		}
+		containerEnvs.put("PATH", "/usr/java/bin:/usr/local/cuda-10.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/hadoop/anaconda3/bin:/usr/java/bin");
+		containerEnvs.put("LD_LIBRARY_PATH", "/usr/local/cuda-10.0/lib64");
+		LOG.info("**************container envs : " + containerEnvs.toString());
 		if (!containerEnvs.isEmpty()) {
 			melonConf.setStrings(MeLoN_ConfigurationKeys.CONTAINER_ENVS, containerEnvsPair.toArray(new String[0]));
 		}

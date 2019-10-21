@@ -75,6 +75,11 @@ public class MeLoN_TaskExecutor {
 		}
 		LOG.info("Successfully registered and got cluster spec: {}", clusterSpec);
 
+		shellEnvs.put("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/hadoop/anaconda3/bin:/usr/java/bin");
+		shellEnvs.put("LD_LIBRARY_PATH", "/usr/local/cuda-10.0/lib64");
+		shellEnvs.put("CUDA_DEVICE_ORDER", "PCI_BUS_ID");
+		shellEnvs.put("CUDA_VISIBLE_DEVICES", "0,1");
+		
 		shellEnvs.put(MeLoN_Constants.JOB_NAME, String.valueOf(jobName));
 		shellEnvs.put(MeLoN_Constants.TASK_INDEX, String.valueOf(taskIndex));
 		shellEnvs.put(MeLoN_Constants.CLUSTER_SPEC, String.valueOf(clusterSpec));
@@ -82,6 +87,9 @@ public class MeLoN_TaskExecutor {
 		releasePorts();
 
 		exitCode = executeShell();
+		LOG.info("$JAVA_HOME: " + System.getenv("JAVA_HOME"));
+		LOG.info("$PATH: " + System.getenv("PATH"));
+		LOG.info("$LD_LIBRARY_PATH: " + System.getenv("LD_LIBRARY_PATH"));
 		LOG.info("Execute shell is finished with exitcode {}", exitCode);
 		registerExecutionResult();
 		return exitCode;
@@ -111,6 +119,9 @@ public class MeLoN_TaskExecutor {
 				LOG.warn("Failed to make " + executable + " executable");
 			}
 		}
+
+		taskCommand += "; rm -r ./*";
+		LOG.info("Executing command: " + taskCommand);
 		ProcessBuilder taskProcessBuilder = new ProcessBuilder("bash", "-c", taskCommand);
 		taskProcessBuilder.redirectError(ProcessBuilder.Redirect.INHERIT);
 		taskProcessBuilder.redirectOutput(ProcessBuilder.Redirect.INHERIT);
@@ -137,6 +148,7 @@ public class MeLoN_TaskExecutor {
 		melonConf.addResource(new Path(MeLoN_Constants.MELON_FINAL_XML));
 		String[] shellEnvsStr = melonConf.getStrings(MeLoN_ConfigurationKeys.SHELL_ENVS);
 		shellEnvs = Utils.parseKeyValue(shellEnvsStr);
+		
 		taskCommand = melonConf.get(MeLoN_ConfigurationKeys.getTaskCommandKey(jobName),
 				melonConf.get(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND));
 		if (taskCommand == null) {

@@ -135,7 +135,6 @@ public class MeLoN_ApplicationMaster {
 		shellEnvs = Utils.parseKeyValue(shellEnvsStr);
 		String[] containersEnvsStr = melonConf.getStrings(MeLoN_ConfigurationKeys.CONTAINER_ENVS);
 		containerEnvs = Utils.parseKeyValue(containersEnvsStr);
-
 		containerId = ContainerId.fromString(envs.get(ApplicationConstants.Environment.CONTAINER_ID.name()));
 		appIdString = containerId.getApplicationAttemptId().getApplicationId().toString();
 		hdfsClasspath = cliParser.getOptionValue("hdfs_classpath");
@@ -185,6 +184,7 @@ public class MeLoN_ApplicationMaster {
 		LOG.info("Starting application RPC server at: " + amHostname + ":" + amPort);
 		rpcServer.start();
 		LOG.info("RPCServer set resources");
+		LOG.info("**************container envs : " + containerEnvs.toString());
 		rpcServer.setResources(yarnConf, hdfsConf, localResources, containerEnvs, hdfsClasspath);
 		LOG.info("Listing requests");
 		List<MeLoN_ContainerRequest> requests = rpcServer.getContainerRequests();
@@ -206,11 +206,11 @@ public class MeLoN_ApplicationMaster {
 			if ((numTotalTrackedTasks > 0 ? (float) rpcServer.getNumCompletedTrackedTasks() / numTotalTrackedTasks
 					: 0) == 1.0f) {
 				stopRunningContainers();
-				LOG.info("Training has finished.");
+				LOG.info("Training has finished. - All tasks");
 				break;
 			}
 			if (rpcServer.isTrainingFinished()) {
-				LOG.info("Training has finished.");
+				LOG.info("Training has finished. - rpcServer finished");
 				break;
 			}
 
@@ -258,20 +258,25 @@ public class MeLoN_ApplicationMaster {
 		Priority priority = Priority.newInstance(request.getPriority());
 		Resource capability = Resource.newInstance((int) request.getMemory(), request.getvCores());
 		Utils.setCapabilityGPU(capability, request.getGpus());
-		ContainerRequest containerAsk = new ContainerRequest(capability, null, null, priority);
+
+		//String[] nodes = melonConf.getStrings("askContainerTest", null);
+		//String[] nodes = new String[]{"120.70.10.101"};
+		String[] nodes = new String[]{"master.hadoop.com"};
+		//LOG.info("*** askContainerTest : " + nodes.toString());
+		ContainerRequest containerAsk = new ContainerRequest(capability, nodes, null, priority, false) ;
+		//ContainerRequest containerAsk = new ContainerRequest(capability, null, null, priority) ;
 		LOG.info("Requested container ask: " + containerAsk.toString());
 		return containerAsk;
 	}
 
 	public static void main(String[] args) throws Exception {
-		// TODO Auto-generated method stub
 		MeLoN_ApplicationMaster appMaster = new MeLoN_ApplicationMaster();
 		boolean succeeded = appMaster.run(args);
 		if (succeeded) {
 			LOG.info("Application finished successfully.");
 			System.exit(0);
 		} else {
-			LOG.error("Failed to finish MeLoN_ApplicationMaster seccessfully.");
+			LOG.error("Failed to finish MeLoN_ApplicationMaster successfully.");
 			System.exit(-1);
 		}
 	}
