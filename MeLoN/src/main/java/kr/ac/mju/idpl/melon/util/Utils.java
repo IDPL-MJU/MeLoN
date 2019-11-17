@@ -197,10 +197,10 @@ public class Utils {
 		int priority = 0;
 		for (String jobName : jobNames) {
 			int numInstances = conf.getInt("melon." + jobName + ".instances", 0);
-			String memoryString = conf.get("melon." + jobName + ".memory", "2g");
-			long memory = Long.parseLong(parseMemoryString(memoryString));
+			long memory = Long.parseLong(parseMemoryString(conf.get("melon." + jobName + ".memory", "2g")));
 			int vCores = conf.getInt("melon." + jobName + ".vcores", 1);
 			int gpus = conf.getInt("melon." + jobName + ".gpus", 0);
+			int gpuMemory = Integer.parseInt(parseMemoryString(conf.get("melon." + jobName + ".gpu-memory-mb", "0")));
 
 			/*
 			 * The priority of different task types MUST be different. Otherwise the
@@ -212,7 +212,7 @@ public class Utils {
 				// We rely on unique priority behavior to match allocation request to task in
 				// Hadoop 2.7
 				containerRequests.put(jobName,
-						new MeLoN_ContainerRequest(jobName, numInstances, memory, vCores, gpus, priority));
+						new MeLoN_ContainerRequest(jobName, numInstances, memory, vCores, gpus, gpuMemory, priority));
 				priority++;
 			}
 		}

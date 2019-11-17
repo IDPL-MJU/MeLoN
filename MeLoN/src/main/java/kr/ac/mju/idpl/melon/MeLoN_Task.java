@@ -10,7 +10,7 @@ public class MeLoN_Task {
 	private String host;
 	private int port = -1;
 	private Container container;
-	private MeLoN_TaskStatus status;
+	private TaskStatus status;
 	private boolean completed = false;
 	private int exitStatus = -1;
 
@@ -59,7 +59,7 @@ public class MeLoN_Task {
 		return this.jobName + ":" + this.taskIndex;
 	}
 
-	public void setStatus(MeLoN_TaskStatus status) {
+	public void setStatus(TaskStatus status) {
 		this.status = status;
 	}
 
@@ -68,13 +68,13 @@ public class MeLoN_Task {
 	        this.exitStatus = status;
 	        switch (status) {
 	          case ContainerExitStatus.SUCCESS:
-	            setStatus(MeLoN_TaskStatus.SUCCEEDED);
+	            setStatus(TaskStatus.SUCCEEDED);
 	            break;
 	          case ContainerExitStatus.KILLED_BY_APPMASTER:
-	            setStatus(MeLoN_TaskStatus.FINISHED);
+	            setStatus(TaskStatus.FINISHED);
 	            break;
 	          default:
-	            setStatus(MeLoN_TaskStatus.FAILED);
+	            setStatus(TaskStatus.FAILED);
 	            break;
 	        }
 	        this.completed = true;

@@ -1,15 +1,29 @@
 package kr.ac.mju.idpl.melon;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Vector;
+import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.GnuParser;
@@ -43,12 +57,19 @@ import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.util.Records;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.w3c.dom.Document;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
 
 import kr.ac.mju.idpl.melon.rpc.RPCServer;
 import kr.ac.mju.idpl.melon.util.Utils;
 
 public class MeLoN_ApplicationMaster {
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_ApplicationMaster.class);
+
+	private String appExecutionType = null;
+	private String gpuAllocMode = "WORST";
+
 	private Configuration yarnConf;
 	private Configuration hdfsConf;
 
@@ -57,7 +78,7 @@ public class MeLoN_ApplicationMaster {
 	private AMRMClientAsync<ContainerRequest> amRMClient;
 	private NMClientAsync nmClientAsync;
 	private NMCallbackHandler containerListener;
-	
+
 	private List<Container> runningContainers = new ArrayList<>();
 	// private ApplicationAttemptId appAttemptID;
 
@@ -87,7 +108,7 @@ public class MeLoN_ApplicationMaster {
 
 	private Map<String, String> shellEnvs = new HashMap<>();
 	private Map<String, String> containerEnvs = new HashMap<>();
-	private String melonHome;
+	// private String melonHome;
 	private String appJar;
 	private String domainController;
 
@@ -98,6 +119,10 @@ public class MeLoN_ApplicationMaster {
 
 	private List<Thread> launchTreads = new ArrayList<Thread>();
 	private Options opts;
+
+	private String[] nodes = new String[] { "master.hadoop.com", "slave1.hadoop.com", "slave2.hadoop.com" };
+	private Map<String, GPUDeviceInfo> nodeGPUInfoMap = new HashMap<>();
+	private List<GPURequest> gpuDeviceAllocInfo = new Vector<>();
 
 	public MeLoN_ApplicationMaster() throws Exception {
 		yarnConf = new Configuration(false);
@@ -138,8 +163,76 @@ public class MeLoN_ApplicationMaster {
 		containerId = ContainerId.fromString(envs.get(ApplicationConstants.Environment.CONTAINER_ID.name()));
 		appIdString = containerId.getApplicationAttemptId().getApplicationId().toString();
 		hdfsClasspath = cliParser.getOptionValue("hdfs_classpath");
+		appExecutionType = melonConf.get("melon.application.execution-type");
+		gpuAllocMode = melonConf.get("melon.application.gpu-alloc");
 
 		return true;
+	}
+
+	private void updateGPUDeviceInfo() throws IOException, InterruptedException, SAXException,
+			ParserConfigurationException, NumberFormatException, XPathExpressionException {
+		for (String host : nodes) {
+			// LOG.info("=================================");
+			// LOG.info("Host = {}", host);
+			ProcessBuilder monitoringProcessBuilder = new ProcessBuilder("sh", "-c",
+					"sshpass -p hadoop ssh -T -oStrictHostKeyChecking=no hadoop@" + host + " nvidia-smi -q -x");
+			Process monitoringProcess = monitoringProcessBuilder.start();
+			monitoringProcess.waitFor();
+			BufferedReader br = new BufferedReader(new InputStreamReader(monitoringProcess.getInputStream()));
+
+			String result = "";
+			String line;
+			for (int i = 0; (line = br.readLine()) != null; i++) {
+				// skip xml document spec
+				if (i > 1) {
+					result = result + line.trim();
+				}
+			}
+			InputSource is = new InputSource(new StringReader(result));
+			Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(is);
+			XPath xPath = XPathFactory.newInstance().newXPath();
+			String expression = "/nvidia_smi_log/attached_gpus";
+			int gpuNum = Integer.parseInt(xPath.compile(expression).evaluate(doc));
+			for (int i = 1; i <= gpuNum; i++) {
+				expression = "/nvidia_smi_log/gpu[" + i + "]/minor_number";
+				int deviceNum = Integer.parseInt(xPath.compile(expression).evaluate(doc));
+				expression = "/nvidia_smi_log/gpu[" + i + "]/fb_memory_usage/total";
+				String totalMemoryUsageStr = xPath.compile(expression).evaluate(doc);
+				int totalMemoryUsage = parseMibStrToMbInt(totalMemoryUsageStr);
+				expression = "/nvidia_smi_log/gpu[" + i + "]/fb_memory_usage/used";
+				String usedMemoryUsageStr = xPath.compile(expression).evaluate(doc);
+				int usedMemoryUsage = parseMibStrToMbInt(usedMemoryUsageStr);
+				expression = "/nvidia_smi_log/gpu[" + i + "]/fb_memory_usage/free";
+				String freeMemoryUsageStr = xPath.compile(expression).evaluate(doc);
+				int freeMemoryUsage = parseMibStrToMbInt(freeMemoryUsageStr);
+
+				String deviceId = host + ":" + deviceNum;
+				if (!nodeGPUInfoMap.containsKey(deviceId)) {
+					nodeGPUInfoMap.put(deviceId, new GPUDeviceInfo(host, deviceNum, totalMemoryUsage, usedMemoryUsage));
+				} else {
+					nodeGPUInfoMap.get(deviceId).updateMemoryUsage(usedMemoryUsage);
+				}
+			}
+		}
+	}
+
+	private void logMonitoredInfo() {
+		LOG.info("=================================");
+		for (String deviceId : nodeGPUInfoMap.keySet()) {
+			LOG.info("***DeviceID={}, total={}(MB), used={}(MB), free={}(MB)",
+					nodeGPUInfoMap.get(deviceId).getDeviceId(), nodeGPUInfoMap.get(deviceId).getTotal(),
+					nodeGPUInfoMap.get(deviceId).getUsed(), nodeGPUInfoMap.get(deviceId).getFree());
+		}
+		LOG.info("=================================");
+	}
+
+	private int parseMibStrToMbInt(String memoryUsageStr) {
+		memoryUsageStr = memoryUsageStr.toLowerCase();
+		int mib = memoryUsageStr.indexOf("mib");
+		if (-1 != mib) {
+			return Integer.parseInt(memoryUsageStr.substring(0, mib).trim()) * 104858 / 100000;
+		}
+		return 0;
 	}
 
 	private void printUsage() {
@@ -149,6 +242,7 @@ public class MeLoN_ApplicationMaster {
 
 	private boolean run(String[] args) throws IOException, YarnException, InterruptedException {
 		long started = System.currentTimeMillis();
+		LOG.info("This application's execution type is " + appExecutionType + ".");
 		if (!init(args)) {
 			return false;
 		}
@@ -165,7 +259,6 @@ public class MeLoN_ApplicationMaster {
 				.setTaskExecutorJVMArgs(melonConf.get(MeLoN_ConfigurationKeys.TASK_EXECUTOR_JVM_OPTS,
 						MeLoN_ConfigurationKeys.TASK_EXECUTOR_JVM_OPTS_DEFAULT))
 				.setMelonConf(melonConf).build();
-		// rpcServer = new RPCServer(amHostname, yarnConf);
 		amPort = rpcServer.getRpcPort();
 		containerEnvs.put(MeLoN_Constants.AM_HOST, amHostname);
 		containerEnvs.put(MeLoN_Constants.AM_PORT, Integer.toString(amPort));
@@ -183,25 +276,64 @@ public class MeLoN_ApplicationMaster {
 
 		LOG.info("Starting application RPC server at: " + amHostname + ":" + amPort);
 		rpcServer.start();
-		LOG.info("RPCServer set resources");
-		LOG.info("**************container envs : " + containerEnvs.toString());
 		rpcServer.setResources(yarnConf, hdfsConf, localResources, containerEnvs, hdfsClasspath);
-		LOG.info("Listing requests");
 		List<MeLoN_ContainerRequest> requests = rpcServer.getContainerRequests();
 		LOG.info("Requests : " + requests.toString());
 		for (MeLoN_ContainerRequest request : requests) {
-			LOG.info("Requesting container ...");
-			ContainerRequest containerAsk = setupContainerAskForRM(request);
-			if (!askedContainerMap.containsKey(request.getJobName())) {
-				askedContainerMap.put(request.getJobName(), new ArrayList<>());
-			}
-			LOG.info("Task type is " + request.getJobName());
-			askedContainerMap.get(request.getJobName()).add(containerAsk);
-			LOG.info("addContainerRequest");
-			amRMClient.addContainerRequest(containerAsk);
-			LOG.info("done");
+			LOG.info("***gpuDeviceAllocInfo put jobName = {}, GPUMemory = {}", request.getJobName(),
+					String.valueOf(request.getGpuMemory()));
+
+			gpuDeviceAllocInfo.add(new GPURequest(request.getJobName(), request.getGpuMemory()));
 		}
+
+		LOG.info("***requests size = {}", requests.size());
+		LOG.info("***gpuDeviceAllocInfo size = {}", gpuDeviceAllocInfo.size());
+
+		boolean allReq = false;
+		boolean allAlloc = false;
 		while (!done) {
+			while (!allReq) {
+				while (!allAlloc) {
+					LOG.info("***==========Updating GPU Resource Info...==========");
+					try {
+						updateGPUDeviceInfo();
+					} catch (NumberFormatException | XPathExpressionException | SAXException
+							| ParserConfigurationException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					logMonitoredInfo();
+					allAlloc = gpuDeviceAllocating();
+
+					if (appExecutionType.equals("amtest")) {
+						LOG.info("This application is AMTest mode. Application will be finished.");
+						return true;
+					}
+					if (!allAlloc && appExecutionType.equals("distributed")) {
+						resetGpuDeviceAllocInfo();
+					} else if (appExecutionType.equals("batch")) {
+						break;
+					}
+				}
+				LOG.info("***==========Adding Container Requests...==========");
+				allReq = true;
+				for (MeLoN_ContainerRequest request : requests) {
+					LOG.info("Requesting container ...");
+					ContainerRequest containerAsk = setupContainerAskForRM(request);
+					if (containerAsk != null) {
+						if (!askedContainerMap.containsKey(request.getJobName())) {
+							askedContainerMap.put(request.getJobName(), new ArrayList<>());
+						}
+						LOG.info("***Task type is " + request.getJobName());
+						askedContainerMap.get(request.getJobName()).add(containerAsk);
+						LOG.info("***addContainerRequest");
+						amRMClient.addContainerRequest(containerAsk);
+						LOG.info("***done");
+					} else {
+						allReq = false;
+					}
+				}
+			}
 			int numTotalTrackedTasks = rpcServer.getTotalTrackedTasks();
 			if ((numTotalTrackedTasks > 0 ? (float) rpcServer.getNumCompletedTrackedTasks() / numTotalTrackedTasks
 					: 0) == 1.0f) {
@@ -234,8 +366,90 @@ public class MeLoN_ApplicationMaster {
 		return status == FinalApplicationStatus.SUCCEEDED;
 	}
 
+	private boolean gpuDeviceAllocating() {
+		boolean allAlloc = true;
+		for (GPURequest gpuReq : gpuDeviceAllocInfo) {
+			String allocDevice = null;
+			int allocDeviceMemoryTotal = 0;
+			int allocDeviceMemoryFree = 0;
+			if (gpuAllocMode.equals("WORST")) {
+				for (String deviceId : nodeGPUInfoMap.keySet()) {
+					if (nodeGPUInfoMap.get(deviceId).getFree() > allocDeviceMemoryFree
+							&& nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
+						allocDevice = nodeGPUInfoMap.get(deviceId).getDeviceId();
+						allocDeviceMemoryTotal = nodeGPUInfoMap.get(deviceId).getTotal();
+						allocDeviceMemoryFree = nodeGPUInfoMap.get(deviceId).getFree();
+					}
+				}
+			} else if (gpuAllocMode.equals("BEST")) {
+				for (String deviceId : nodeGPUInfoMap.keySet()) {
+					if (allocDeviceMemoryFree == 0) {
+						allocDeviceMemoryFree = Integer.MAX_VALUE;
+					}
+					if (nodeGPUInfoMap.get(deviceId).getFree() < allocDeviceMemoryFree
+							&& nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
+						allocDevice = nodeGPUInfoMap.get(deviceId).getDeviceId();
+						allocDeviceMemoryTotal = nodeGPUInfoMap.get(deviceId).getTotal();
+						allocDeviceMemoryFree = nodeGPUInfoMap.get(deviceId).getFree();
+					}
+				}
+			} else if (gpuAllocMode.equals("WHOLE")) {
+				for (String deviceId : nodeGPUInfoMap.keySet()) {
+					if (nodeGPUInfoMap.get(deviceId).getUsed() < 500
+							&& nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
+						allocDevice = nodeGPUInfoMap.get(deviceId).getDeviceId();
+						allocDeviceMemoryTotal = nodeGPUInfoMap.get(deviceId).getTotal();
+						allocDeviceMemoryFree = nodeGPUInfoMap.get(deviceId).getFree();
+					}
+				}
+			}
+			LOG.info("Task({}) using {}MB Gpu memory.", gpuReq.getRequestTask(), gpuReq.getRequiredGPUMemory());
+			LOG.info("allocDevice = {}, allocDeviceFree = {}/{}", allocDevice, allocDeviceMemoryFree,
+					allocDeviceMemoryTotal);
+			if ((int) (gpuReq.getRequiredGPUMemory() * 1.1) <= 0) {
+				// entry.put("DEVICE", "none");
+				// entry.put("DEVICE_TOTAL_GPU_MEMORY", "none");
+				// entry.put("STATUS", "ready");
+				gpuReq.setStatusReady();
+			} else if ((int) (gpuReq.getRequiredGPUMemory() * 1.1) < allocDeviceMemoryFree) {
+				// entry.put("DEVICE", allocDevice);
+				// entry.put("DEVICE_TOTAL_GPU_MEMORY", String.valueOf(allocDeviceMemoryTotal));
+				// entry.put("STATUS", "ready");
+				gpuReq.deviceAlloc(nodeGPUInfoMap.get(allocDevice));
+				nodeGPUInfoMap.get(allocDevice).allocateMemory((int) (gpuReq.getRequiredGPUMemory() * 1.1),
+						gpuReq.getRequestTask());
+			} else {
+				// entry.put("DEVICE", null);
+				// entry.put("DEVICE_TOTAL_GPU_MEMORY", null);
+				// entry.put("STATUS", "non-ready");
+				gpuReq.setStatusNotReady();
+				allAlloc = false;
+			}
+		}
+
+		// just for test
+		for (GPURequest gpuReq : gpuDeviceAllocInfo) {
+			if (gpuReq.getDevice() != null) {
+				LOG.info("***GPURequestStatus = {}, GPUMemory = {}, Task = {}, host:Device = {}",
+						gpuReq.getRequestStatus(), gpuReq.getRequiredGPUMemory(), gpuReq.getRequestTask(),
+						gpuReq.getDevice().getDeviceId());
+			} else {
+				LOG.info("***GPURequestStatus = {}, GPUMemory = {}, Task = {}", gpuReq.getRequestStatus(),
+						gpuReq.getRequiredGPUMemory(), gpuReq.getRequestTask());
+			}
+		}
+		return allAlloc;
+	}
+
+	private void resetGpuDeviceAllocInfo() {
+		LOG.info("Reset gpuDeviceAllocInfo...");
+		for (GPURequest gpuReq : gpuDeviceAllocInfo) {
+			gpuReq.resetRequest();
+		}
+	}
+
 	private void stopRunningContainers() throws InterruptedException {
-		//List<Container> allContainers = sessionContainersMap.get(session.sessionId);
+		// List<Container> allContainers = sessionContainersMap.get(session.sessionId);
 		if (runningContainers != null) {
 			for (Container container : runningContainers) {
 				MeLoN_Task task = rpcServer.getTask(container.getId());
@@ -249,8 +463,8 @@ public class MeLoN_ApplicationMaster {
 		Thread.sleep(15000);
 		boolean result = rpcServer.getNumCompletedTasks() == rpcServer.getTotalTasks();
 		if (!result) {
-			LOG.warn("Not all containers were stopped or completed. Only " + rpcServer.getNumCompletedTasks() + " out of "
-					+ rpcServer.getTotalTasks() + " finished.");
+			LOG.warn("Not all containers were stopped or completed. Only " + rpcServer.getNumCompletedTasks()
+					+ " out of " + rpcServer.getTotalTasks() + " finished.");
 		}
 	}
 
@@ -258,14 +472,29 @@ public class MeLoN_ApplicationMaster {
 		Priority priority = Priority.newInstance(request.getPriority());
 		Resource capability = Resource.newInstance((int) request.getMemory(), request.getvCores());
 		Utils.setCapabilityGPU(capability, request.getGpus());
-
-		//String[] nodes = melonConf.getStrings("askContainerTest", null);
-		//String[] nodes = new String[]{"120.70.10.101"};
-		String[] nodes = new String[]{"master.hadoop.com"};
-		//LOG.info("*** askContainerTest : " + nodes.toString());
-		ContainerRequest containerAsk = new ContainerRequest(capability, nodes, null, priority, false) ;
-		//ContainerRequest containerAsk = new ContainerRequest(capability, null, null, priority) ;
-		LOG.info("Requested container ask: " + containerAsk.toString());
+		boolean requested = false;
+		String[] node = null;
+		for (GPURequest gpuReq : gpuDeviceAllocInfo) {
+			if(gpuReq.getRequestTask().equals(request.getJobName()) && gpuReq.isReady()) {
+				if(gpuReq.getDevice() != null) {
+					node = new String[] {gpuReq.getDevice().getDeviceHost()};
+					LOG.info("Launching Task({}) at {}.",gpuReq.getRequestTask(), gpuReq.getDevice().getDeviceId());
+				}else {
+					node = null;
+					LOG.info("Launching Task({}) at somewhere:none...", gpuReq.getRequestTask());
+				}
+				gpuReq.setStatusRequested();
+				requested = true;
+				break;
+			}
+		}
+		ContainerRequest containerAsk;
+		if (requested) {
+			containerAsk = new ContainerRequest(capability, node, null, priority, false);
+			LOG.info("Requested container ask: " + containerAsk.toString());
+		} else {
+			containerAsk = null;
+		}
 		return containerAsk;
 	}
 
@@ -279,6 +508,25 @@ public class MeLoN_ApplicationMaster {
 			LOG.error("Failed to finish MeLoN_ApplicationMaster successfully.");
 			System.exit(-1);
 		}
+	}
+
+	public synchronized Map<String, String> getGPUDeviceEnv(Container container, MeLoN_Task task) {
+		Map<String, String> env = new ConcurrentHashMap<>();
+		for (GPURequest gpuReq : gpuDeviceAllocInfo) {
+			if(gpuReq.getRequestTask().equals(task.getJobName()) && gpuReq.getDevice() != null 
+					&& gpuReq.getDevice().getDeviceHost().equals(container.getNodeId().getHost())
+					&& gpuReq.isRequested()) {
+				gpuReq.setStatusAllocated();
+				env.put("CUDA_VISIBLE_DEVICES", String.valueOf(gpuReq.getDevice().getDeviceNum()));
+				env.put("FRACTION", gpuReq.getFraction());
+				LOG.info("\n***Extra envs set." + "\n***Task = " + task.getJobName() + ":" + task.getTaskIndex()
+						+ "\n***Device = " + gpuReq.getDevice().getDeviceId() + ", Using " + gpuReq.getRequiredGPUMemory() + "/"
+						+ gpuReq.getDevice().getTotal() + "MB, Fraction = " + gpuReq.getFraction() + "\n***ContainerId = "
+						+ container.getId());
+				break;
+			}
+		}
+		return env;
 	}
 
 	private class NMCallbackHandler implements NMClientAsync.CallbackHandler {
@@ -350,9 +598,9 @@ public class MeLoN_ApplicationMaster {
 						+ ", exitStatus = " + exitStatus);
 				String diagnotics = containerStatus.getDiagnostics();
 				if (ContainerExitStatus.SUCCESS != exitStatus) {
-					LOG.error(diagnotics);
+					LOG.error("Container Exit Status is not SUCCESS. Diagnotics: {}", diagnotics);
 				} else {
-					LOG.info(diagnotics);
+					LOG.info("Container Exit Status is SUCCESS. Diagnotics: {}", diagnotics);
 				}
 				processFinishedContainer(containerStatus.getContainerId(), exitStatus);
 			}
@@ -401,7 +649,20 @@ public class MeLoN_ApplicationMaster {
 				LOG.error("Task was null. Nothing to schedule.");
 			}
 			task.setContainer(container);
-			task.setStatus(MeLoN_TaskStatus.READY);
+			task.setStatus(TaskStatus.READY);
+
+			Map<String, String> containerLaunchEnvs = new ConcurrentHashMap<>(containerEnvs);
+			String jobName = task.getJobName();
+			String taskIndex = task.getTaskIndex();
+			containerLaunchEnvs.put(MeLoN_Constants.JOB_NAME, jobName);
+			containerLaunchEnvs.put(MeLoN_Constants.TASK_INDEX, taskIndex);
+			containerLaunchEnvs.put(MeLoN_Constants.TASK_NUM, String.valueOf(rpcServer.getTotalTrackedTasks()));
+			// containerLaunchEnvs.put(MeLoN_Constants.SESSION_ID,
+			// String.valueOf(appSession.sessionId));
+
+			containerLaunchEnvs.put("APP_EXECUTION_TYPE", appExecutionType);
+
+			containerLaunchEnvs.putAll(getGPUDeviceEnv(container, task));
 
 			// Add job type specific resources
 			Map<String, LocalResource> containerResources = new ConcurrentHashMap<>(localResources);
@@ -416,20 +677,10 @@ public class MeLoN_ApplicationMaster {
 			rpcServer.addContainer(container.getId(), task);
 			LOG.info("Setting Container [" + container.getId() + "] for task [" + task.getId() + "]..");
 
-			Map<String, String> containerLaunchEnvs = new ConcurrentHashMap<>(containerEnvs);
-
-			String jobName = task.getJobName();
-			String taskIndex = task.getTaskIndex();
-			containerLaunchEnvs.put(MeLoN_Constants.JOB_NAME, jobName);
-			containerLaunchEnvs.put(MeLoN_Constants.TASK_INDEX, taskIndex);
-			containerLaunchEnvs.put(MeLoN_Constants.TASK_NUM, String.valueOf(rpcServer.getTotalTrackedTasks()));
-			// containerLaunchEnvs.put(MeLoN_Constants.SESSION_ID,
-			// String.valueOf(appSession.sessionId));
-
 			List<String> vargs = new ArrayList<>();
 			vargs.add(rpcServer.getTaskCommand());
-			vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/MeLoN_TaskExecutor.stdout");
-			vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/MeLoN_TaskExecutor.stderr");
+			vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/te.stdout");
+			vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/te.stderr");
 			String command = String.join(" ", vargs);
 			List<String> commands = new ArrayList<String>();
 			commands.add(command);
@@ -445,7 +696,7 @@ public class MeLoN_ApplicationMaster {
 			// Collections.synchronizedList(new ArrayList<>())).add(container);
 
 			nmClientAsync.startContainerAsync(container, ctx);
-			task.setStatus(MeLoN_TaskStatus.RUNNING);
+			task.setStatus(TaskStatus.RUNNING);
 			LOG.info("Container {} launched!", container.getId());
 		}
 

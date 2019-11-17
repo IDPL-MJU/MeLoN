@@ -37,6 +37,11 @@ public class MeLoN_TaskExecutor {
 	private Configuration yarnConf = new Configuration(false);
 	private Configuration hdfsConf = new Configuration(false);
 	private int exitCode = -1;
+	private String appExecutionType;
+
+	public MeLoN_TaskExecutor() {
+		appExecutionType = System.getenv("APP_EXECUTION_TYPE");
+	}
 
 	public static void main(String[] args) {
 		LOG.info("MeLoN_TaskExecutor is running...");
@@ -57,41 +62,50 @@ public class MeLoN_TaskExecutor {
 		Utils.extractResources();
 
 		LOG.info("This container's jobName is {}", jobName);
-		InetSocketAddress addr = new InetSocketAddress(amHost, amPort);
-		try {
-			amClient = RPC.getProxy(RPCProtocol.class, RPCProtocol.versionID, addr, yarnConf);
-		} catch (IOException e) {
-			LOG.error("Connecting to ApplicationMaster " + amHost + ":" + amPort + " failed!");
-			LOG.error("Container will suicide!");
-			System.exit(1);
+		if(appExecutionType.equals("distributed")) {
+			InetSocketAddress addr = new InetSocketAddress(amHost, amPort);
+			try {
+				amClient = RPC.getProxy(RPCProtocol.class, RPCProtocol.versionID, addr, yarnConf);
+			} catch (IOException e) {
+				LOG.error("Connecting to ApplicationMaster " + amHost + ":" + amPort + " failed!");
+				LOG.error("Container will suicide!");
+				System.exit(1);
+			}
+			rpcSocket = new ServerSocket(0);
+			rpcPort = rpcSocket.getLocalPort();
+			LOG.info("Reserved rpcPort: " + this.rpcPort);
+			clusterSpec = registerAndGetClusterSpec();
+			if (clusterSpec == null) {
+				LOG.error("Failed to register worker with AM.");
+				throw new Exception("Failed to register worker with AM.");
+			}
+			LOG.info("Successfully registered and got cluster spec: {}", clusterSpec);
+			shellEnvs.put(MeLoN_Constants.CLUSTER_SPEC, String.valueOf(clusterSpec));
 		}
-		rpcSocket = new ServerSocket(0);
-		rpcPort = rpcSocket.getLocalPort();
-		LOG.info("Reserved rpcPort: " + this.rpcPort);
-		clusterSpec = registerAndGetClusterSpec();
-		if (clusterSpec == null) {
-			LOG.error("Failed to register worker with AM.");
-			throw new Exception("Failed to register worker with AM.");
-		}
-		LOG.info("Successfully registered and got cluster spec: {}", clusterSpec);
-
+		
 		shellEnvs.put("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/hadoop/anaconda3/bin:/usr/java/bin");
 		shellEnvs.put("LD_LIBRARY_PATH", "/usr/local/cuda-10.0/lib64");
 		shellEnvs.put("CUDA_DEVICE_ORDER", "PCI_BUS_ID");
-		shellEnvs.put("CUDA_VISIBLE_DEVICES", "0,1");
+		if(System.getenv("CUDA_VISIBLE_DEVICES") != null) {
+			shellEnvs.put("CUDA_VISIBLE_DEVICES", System.getenv("CUDA_VISIBLE_DEVICES"));
+		}
+		if(System.getenv("FRACTION") != null) {
+			shellEnvs.put("FRACTION", System.getenv("FRACTION"));
+		}
+		LOG.info("***CUDA_VISIBLE_DEVICES = {}", System.getenv("CUDA_VISIBLE_DEVICES"));
+		LOG.info("***FRACTION = {}", System.getenv("FRACTION"));
 		
 		shellEnvs.put(MeLoN_Constants.JOB_NAME, String.valueOf(jobName));
 		shellEnvs.put(MeLoN_Constants.TASK_INDEX, String.valueOf(taskIndex));
-		shellEnvs.put(MeLoN_Constants.CLUSTER_SPEC, String.valueOf(clusterSpec));
 
 		releasePorts();
 
 		exitCode = executeShell();
-		LOG.info("$JAVA_HOME: " + System.getenv("JAVA_HOME"));
-		LOG.info("$PATH: " + System.getenv("PATH"));
-		LOG.info("$LD_LIBRARY_PATH: " + System.getenv("LD_LIBRARY_PATH"));
+		LOG.info("***Task = {}:{}, Device = {}:{}", String.valueOf(jobName), String.valueOf(taskIndex), 
+				System.getenv(ApplicationConstants.Environment.NM_HOST.name()),
+				System.getenv("CUDA_VISIBLE_DEVICES"));
 		LOG.info("Execute shell is finished with exitcode {}", exitCode);
-		registerExecutionResult();
+		//registerExecutionResult();
 		return exitCode;
 	}
 
@@ -111,15 +125,16 @@ public class MeLoN_TaskExecutor {
 
 	private int executeShell() throws IOException, InterruptedException {
 		LOG.info("Executing command: " + taskCommand);
-		String executablePath = taskCommand.trim().split(" ")[0];
-		File executable = new File(executablePath);
-
-		if (!executable.canExecute()) {
-			if (!executable.setExecutable(true)) {
-				LOG.warn("Failed to make " + executable + " executable");
+		if (!appExecutionType.equals("shelltest")) {
+			String executablePath = taskCommand.trim().split(" ")[0];
+			File executable = new File(executablePath);
+			if (!executable.canExecute()) {
+				if (!executable.setExecutable(true)) {
+					LOG.warn("Failed to make " + executable + " executable");
+				}
 			}
 		}
-
+		
 		taskCommand += "; rm -r ./*";
 		LOG.info("Executing command: " + taskCommand);
 		ProcessBuilder taskProcessBuilder = new ProcessBuilder("bash", "-c", taskCommand);

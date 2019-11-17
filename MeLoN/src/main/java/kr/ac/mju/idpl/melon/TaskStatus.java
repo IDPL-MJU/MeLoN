@@ -1,6 +1,6 @@
 package kr.ac.mju.idpl.melon;
 
-public enum MeLoN_TaskStatus{
+public enum TaskStatus{
 	NEW,
 	READY,
 	RUNNING,

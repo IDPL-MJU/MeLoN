@@ -16,6 +16,8 @@ public class MeLoN_ConfigurationKeys {
 	public static final int AM_VCORES_DEFAULT = 1;
 	public static final String AM_GPUS = MELON_PREFIX + AM_PREFIX + "gpus";
 	public static final int AM_GPUS_DEFAULT = 0;
+	public static final String AM_GPU_MEMORY = MELON_PREFIX + AM_PREFIX + "gpu-memory-mb";
+	public static final int AM_GPU_MEMORY_DEFAULT = 0;
 
 	public static final String APPLICATION_PREFIX = MELON_PREFIX + "application.";
 	public static final String APPLICATION_NAME = MELON_PREFIX + APPLICATION_PREFIX + "name";
@@ -40,6 +42,7 @@ public class MeLoN_ConfigurationKeys {
 	public static final String CONTAINERS_COMMAND = MELON_PREFIX + "containers.command";
 
 	public static final String INSTANCES_REGEX = "melon\\.([a-z]+)\\.instances";
+	public static final String GPUMEMORY_REGEX = "melon\\.([a-z]+)\\.gpu-memory-mb";
 	public static final String RESOURCES_REGEX = "melon\\.([a-z]+)\\.resources";
 	// Configurations that can take multiple values.
 	public static final List<String> MULTI_VALUE_CONF = Collections

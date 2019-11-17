@@ -64,6 +64,8 @@ import kr.ac.mju.idpl.melon.MeLoN_Client;
 public class MeLoN_Client {
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_Client.class);
 
+	private String appExecutionType = null;
+	private String gpuAllocMode = null;
 	// Configurations
 	private YarnClient yarnClient;
 	private YarnConfiguration yarnConf;
@@ -105,6 +107,8 @@ public class MeLoN_Client {
 		hdfsConf = new Configuration();
 		melonConf = new Configuration(false);
 		yarnClient = YarnClient.createYarnClient();
+		String appExecutionType = "distributed";
+		String gpuAllocMode = "WORST";
 	}
 
 	private void initHdfsConf() {
@@ -131,7 +135,7 @@ public class MeLoN_Client {
 		}
 		if (yarnConfAddress != null) {
 			yarnConf.addResource(new Path(this.yarnConfAddress));
-		} 
+		}
 		LOG.info("Finished initializing YARN configurations...");
 	}
 
@@ -140,7 +144,6 @@ public class MeLoN_Client {
 		// opts.addOption("appName", true, "Application Name. Default value - melon");
 		// opts.addOption("priority", true, "Application Priority. Default value - 0");
 		// opts.addOption("hdfs_classpath", true, "Path to jars on HDFS for workers.");
-		opts.addOption("dist_shell", true, "The distributed shell commnad for all container.");
 		opts.addOption("python_venv", true, "The python virtual environment zip. Default : venv.zip");
 		opts.addOption("python_bin_path", true, "The relative path to python binary. Default : Python/bin/python");
 		opts.addOption("executes", true, "The file to execute on containers.");
@@ -150,10 +153,10 @@ public class MeLoN_Client {
 		opts.addOption("conf_file", true, "Name of user specified conf file, on the classpath. Default : melon.xml");
 		opts.addOption("src_dir", true, "Name of directory of source files. Default : src");
 		opts.addOption("jar", true, "JAR file containing the application master. Default : melon.jar");
+		opts.addOption("test_shell", true, "The distributed shell commnad for all container.");
+		opts.addOption("app_execution_type", true, "Batch - batch, Distributed - distributed, Test - clienttest/amtest/shelltest. Default : distributed");
+		opts.addOption("gpu_alloc_mode", true, "(WORST, BEST)");
 		opts.addOption("help", false, "Print usage.");
-		
-		// for test
-		opts.addOption("askContainerTest", true, "Test for asking container to specific nodes.");
 	}
 
 	private void initMelonConf(CommandLine cliParser) throws IOException {
@@ -195,7 +198,7 @@ public class MeLoN_Client {
 			return false;
 		}
 		initMelonConf(cliParser);
-		
+
 		hdfsConfAddress = melonConf.get(MeLoN_ConfigurationKeys.HDFS_CONF_PATH);
 		yarnConfAddress = melonConf.get(MeLoN_ConfigurationKeys.YARN_CONF_PATH);
 		initHdfsConf();
@@ -211,16 +214,29 @@ public class MeLoN_Client {
 		pythonVenv = cliParser.getOptionValue("python_venv", "venv.zip");
 		taskParams = cliParser.getOptionValue("task_params");
 		executes = buildTaskCommand(pythonVenv, pythonBinaryPath, cliParser.getOptionValue("executes"), taskParams);
-
-		if (cliParser.hasOption("dist_shell")) {
-			executes = cliParser.getOptionValue("dist_shell");
-		}
 		
+		if (cliParser.hasOption("app_execution_type")) {
+			appExecutionType = cliParser.getOptionValue("app_execution_type");
+			if(appExecutionType.equals("shelltest")) {
+				if (cliParser.hasOption("test_shell")) {
+					executes = cliParser.getOptionValue("test_shell");
+				}else {
+					executes = "nvidia-smi";
+				}
+			}
+		}
+		melonConf.set("melon.application.execution-type", appExecutionType);
+		
+		if (cliParser.hasOption("gpu_alloc_mode")) {
+			gpuAllocMode = cliParser.getOptionValue("gpu_alloc_mode");
+		}
+		melonConf.set("melon.application.gpu-alloc", gpuAllocMode);
+
 		melonConf.set(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND, executes);
 
 		srcDir = cliParser.getOptionValue("src_dir", "src");
 		melonJarPath = cliParser.getOptionValue("jar", "melon.jar");
-		
+
 		if (amMemory < 0) {
 			throw new IllegalArgumentException(
 					"Invalid memory specified for application master exiting." + "Specified Memory =" + amMemory);
@@ -260,7 +276,8 @@ public class MeLoN_Client {
 			containerEnvsPair.addAll(Arrays.asList(envs));
 			containerEnvs.putAll(Utils.parseKeyValue(envs));
 		}
-		containerEnvs.put("PATH", "/usr/java/bin:/usr/local/cuda-10.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/hadoop/anaconda3/bin:/usr/java/bin");
+		containerEnvs.put("PATH",
+				"/usr/java/bin:/usr/local/cuda-10.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/hadoop/anaconda3/bin:/usr/java/bin");
 		containerEnvs.put("LD_LIBRARY_PATH", "/usr/local/cuda-10.0/lib64");
 		LOG.info("**************container envs : " + containerEnvs.toString());
 		if (!containerEnvs.isEmpty()) {
@@ -287,10 +304,11 @@ public class MeLoN_Client {
 			}
 			LOG.info("The container task command was builded. [ " + containerCmd + " ]");
 			return containerCmd;
-		} else if(dist_shell != null){
+		} else if (dist_shell != null) {
 			return dist_shell;
 		} else {
-			LOG.info("The container task command wasn't builded. (There is no option value 'executes' in the command line.");
+			LOG.info(
+					"The container task command wasn't builded. (There is no option value 'executes' in the command line.");
 			return null;
 		}
 	}
@@ -357,10 +375,11 @@ public class MeLoN_Client {
 				MeLoN_ConfigurationKeys.APPLICATION_NAME_DEFAULT);
 		appContext.setApplicationName(appName);
 		appId = appContext.getApplicationId();
-		
-		amQueue = melonConf.get(MeLoN_ConfigurationKeys.YARN_QUEUE_NAME, MeLoN_ConfigurationKeys.YARN_QUEUE_NAME_DEFAULT);
+
+		amQueue = melonConf.get(MeLoN_ConfigurationKeys.YARN_QUEUE_NAME,
+				MeLoN_ConfigurationKeys.YARN_QUEUE_NAME_DEFAULT);
 		appContext.setQueue(amQueue);
-		
+
 		appResourcesPath = new Path(fs.getHomeDirectory(), appName + File.separator + appId.toString());
 
 		melonFinalConfPath = processMelonFinalConf();
@@ -387,15 +406,19 @@ public class MeLoN_Client {
 		amContainer.setEnvironment(containerEnvs);
 		amContainer.setCommands(buildAMCommand());
 
+		if(appExecutionType.equals("clienttest")) {
+			return 0;
+		}
+		
 		appContext.setAMContainerSpec(amContainer);
 		LOG.info("*********am.resources : " + localResources.toString());
 		LOG.info("*********am.resources : " + localResources);
 
-		LOG.info("Submitting YARN application" + "["+ appId + "]");
+		LOG.info("Submitting YARN application" + "[" + appId + "]");
 		yarnClient.submitApplication(appContext);
 		LOG.info("***melonFinalConf : " + melonConf.getValByRegex("melon\\.([a-z]+)\\.([a-z]+)"));
 		// ApplicationReport report = yarnClient.getApplicationReport(appId);
-		//return monitorApplication();
+		// return monitorApplication();
 		return 0;
 	}
 
@@ -405,9 +428,9 @@ public class MeLoN_Client {
 		vargs.add("-Xmx" + (int) amMemory + "m");
 		vargs.add(melonAMClass);
 		vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + File.separatorChar
-				+ "/MeLoN_ApplicationMaster.stdout");
+				+ "/am.stdout");
 		vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + File.separatorChar
-				+ "/MeLoN_ApplicationMaster.stderr");
+				+ "/am.stderr");
 		String command = String.join(" ", vargs);
 		List<String> commands = new ArrayList<String>();
 		commands.add(command);
@@ -422,7 +445,8 @@ public class MeLoN_Client {
 		long mFinalConfLength = mFinalConfStatus.getLen();
 		long mFinalConfTimestamp = mFinalConfStatus.getModificationTime();
 		containerEnvs.put(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.PATH_SUFFIX, mFinalConfPath.toString());
-		containerEnvs.put(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.LENGTH_SUFFIX, Long.toString(mFinalConfLength));
+		containerEnvs.put(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.LENGTH_SUFFIX,
+				Long.toString(mFinalConfLength));
 		containerEnvs.put(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.TIMESTAMP_SUFFIX,
 				Long.toString(mFinalConfTimestamp));
 		LocalResource mJarResource = localResources.get(MeLoN_Constants.MELON_JAR);
@@ -435,7 +459,8 @@ public class MeLoN_Client {
 		containerEnvs.put(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.TIMESTAMP_SUFFIX,
 				Long.toString(mJarTimestamp));
 
-		// Setting all required classpaths including the classpath to "." for the app jar
+		// Setting all required classpaths including the classpath to "." for the app
+		// jar
 		StringBuilder classPathEnv = new StringBuilder(ApplicationConstants.Environment.CLASSPATH.$())
 				.append(ApplicationConstants.CLASS_PATH_SEPARATOR).append("./*");
 		for (String c : yarnConf.getStrings(YarnConfiguration.YARN_APPLICATION_CLASSPATH,

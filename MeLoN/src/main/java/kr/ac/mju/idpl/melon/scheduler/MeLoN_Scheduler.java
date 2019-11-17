@@ -35,8 +35,8 @@ public class MeLoN_Scheduler {
 			if (nodeResourceInfo.containsKey(host)) {
 				nri = nodeResourceInfo.get(host);
 			}
-			LOG.info("=================================");
-			LOG.info("Host = {}", host);
+//			LOG.info("=================================");
+//			LOG.info("Host = {}", host);
 			ProcessBuilder monitoringProcessBuilder = new ProcessBuilder("sh", "-c",
 					"ssh " + host + " nvidia-smi -q -x");
 			Process monitoringProcess = monitoringProcessBuilder.start();
@@ -56,7 +56,7 @@ public class MeLoN_Scheduler {
 			XPath xPath = XPathFactory.newInstance().newXPath();
 			String expression = "/nvidia_smi_log/attached_gpus";
 			int gpuNum = Integer.parseInt(xPath.compile(expression).evaluate(doc));
-			LOG.info("*********************************");
+//			LOG.info("*********************************");
 			for (int i = 1; i <= gpuNum; i++) {
 				expression = "/nvidia_smi_log/gpu[" + i + "]/minor_number";
 				int deviceNum = Integer.parseInt(xPath.compile(expression).evaluate(doc));
@@ -71,23 +71,21 @@ public class MeLoN_Scheduler {
 				int freeMemoryUsage = parseMibStrToMbInt(freeMemoryUsageStr);
 
 				if (nri.getGPUDeviceInfo(i-1) == null) {
-					LOG.info("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
 					GPUDeviceInfo gdi = new GPUDeviceInfo(host, deviceNum, usedMemoryUsage,
 							freeMemoryUsage + usedMemoryUsage);
 					nri.putGPUDeviceInfo(gdi);
 				} else {
-					LOG.info("OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO");
 					nri.updateGPUDeviceInfo(i-1, usedMemoryUsage);
 				}
 
-				LOG.info("***Device number = {}", deviceNum);
-				LOG.info("***Total Memory Usage = {}(MiB), {}(MB)", totalMemoryUsageStr, totalMemoryUsage);
-				LOG.info("***Used Memory Usage = {}(MiB), {}(MB)", usedMemoryUsageStr, usedMemoryUsage);
-				LOG.info("***Free Memory Usage = {}(MiB), {}(MB)", freeMemoryUsageStr, freeMemoryUsage);
-				LOG.info("*********************************");
+//				LOG.info("***Device number = {}", deviceNum);
+//				LOG.info("***Total Memory Usage = {}(MiB), {}(MB)", totalMemoryUsageStr, totalMemoryUsage);
+//				LOG.info("***Used Memory Usage = {}(MiB), {}(MB)", usedMemoryUsageStr, usedMemoryUsage);
+//				LOG.info("***Free Memory Usage = {}(MiB), {}(MB)", freeMemoryUsageStr, freeMemoryUsage);
+//				LOG.info("*********************************");
 			}
 			nodeResourceInfo.put(host, nri);
-			LOG.info("=================================");
+//			LOG.info("=================================");
 		}
 
 	}
