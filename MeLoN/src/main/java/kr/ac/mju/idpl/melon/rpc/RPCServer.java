@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
 
+import kr.ac.mju.idpl.melon.ExecutorExecutionResult;
 import kr.ac.mju.idpl.melon.MeLoN_Constants;
 import kr.ac.mju.idpl.melon.MeLoN_ContainerRequest;
 import kr.ac.mju.idpl.melon.MeLoN_Task;
@@ -67,6 +68,7 @@ public class RPCServer extends Thread implements RPCProtocol {
 	private Map<String, MeLoN_Task[]> jobTasks = new ConcurrentHashMap<>();
 	private boolean trainingFinished = false;
 	private FinalApplicationStatus trainingFinalStatus = FinalApplicationStatus.UNDEFINED;
+	private Map<String, ExecutorExecutionResult> results = new ConcurrentHashMap<>();
 
 	public RPCServer(Builder builder) {
 		this.jvmArgs = builder.jvmArgs;
@@ -289,6 +291,10 @@ public class RPCServer extends Thread implements RPCProtocol {
 	public void addContainer(ContainerId containerId, MeLoN_Task task) {
 		containerIdMap.put(containerId, task);
 	}
+	
+	public Map<String, ExecutorExecutionResult> getExecutorExecutionResult() {
+		return results;
+	}
 
 	public void run() {
 		LOG.info("Running RPCServer ...");
@@ -358,10 +364,11 @@ public class RPCServer extends Thread implements RPCProtocol {
 	}
 
 	@Override
-	public String registerExecutionResult(int exitCode, String jobName, String taskIndex) throws Exception {
-		LOG.info("Received result registration request with exit code " + exitCode + " from " + jobName + " "
-				+ taskIndex);
-		MeLoN_Task task = getTask(jobName, taskIndex);
+	public String registerExecutionResult(ExecutorExecutionResult result) throws Exception {
+		LOG.info("Received result registration request with exit code " + result.getExitCode() + " from " + result.getJobName() + " "
+				+ result.getTaskIndex());
+		results.put(result.getTaskId(), result);
+		MeLoN_Task task = getTask(result.getJobName(), String.valueOf(result.getTaskIndex()));
 		return "RECEIVED";
 	}
 

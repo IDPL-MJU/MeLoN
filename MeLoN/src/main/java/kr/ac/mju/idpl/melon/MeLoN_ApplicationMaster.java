@@ -22,6 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 
@@ -58,6 +59,7 @@ import org.apache.hadoop.yarn.util.Records;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
@@ -196,21 +198,38 @@ public class MeLoN_ApplicationMaster {
 			for (int i = 1; i <= gpuNum; i++) {
 				expression = "/nvidia_smi_log/gpu[" + i + "]/minor_number";
 				int deviceNum = Integer.parseInt(xPath.compile(expression).evaluate(doc));
+
 				expression = "/nvidia_smi_log/gpu[" + i + "]/fb_memory_usage/total";
 				String totalMemoryUsageStr = xPath.compile(expression).evaluate(doc);
 				int totalMemoryUsage = parseMibStrToMbInt(totalMemoryUsageStr);
+
 				expression = "/nvidia_smi_log/gpu[" + i + "]/fb_memory_usage/used";
 				String usedMemoryUsageStr = xPath.compile(expression).evaluate(doc);
 				int usedMemoryUsage = parseMibStrToMbInt(usedMemoryUsageStr);
+
 				expression = "/nvidia_smi_log/gpu[" + i + "]/fb_memory_usage/free";
 				String freeMemoryUsageStr = xPath.compile(expression).evaluate(doc);
 				int freeMemoryUsage = parseMibStrToMbInt(freeMemoryUsageStr);
 
+				expression = "/nvidia_smi_log/gpu[" + i + "]/processes";
+				NodeList nl = (NodeList) xPath.compile(expression).evaluate(doc, XPathConstants.NODESET);
+				int cptPsCnt = 0;
+				for(int pn = 1; pn <= nl.getLength(); pn++) {
+					expression = "/nvidia_smi_log/gpu[\" + i + \"]/processes/process_info[" + pn + "]/type";
+					if(xPath.compile(expression).evaluate(doc).contains("C")){
+						cptPsCnt++;
+					}
+				}
+				LOG.info("***cptPsCnt = {}", cptPsCnt);
+				
+				expression = "/nvidia_smi_log/gpu[" + i + "]/utilization/gpu_util";
+				int gpuUtil = Integer.parseInt(xPath.compile(expression).evaluate(doc).replaceAll("%", "").trim());
+
 				String deviceId = host + ":" + deviceNum;
 				if (!nodeGPUInfoMap.containsKey(deviceId)) {
-					nodeGPUInfoMap.put(deviceId, new GPUDeviceInfo(host, deviceNum, totalMemoryUsage, usedMemoryUsage));
+					nodeGPUInfoMap.put(deviceId, new GPUDeviceInfo(host, deviceNum, totalMemoryUsage, usedMemoryUsage, cptPsCnt, gpuUtil));
 				} else {
-					nodeGPUInfoMap.get(deviceId).updateMemoryUsage(usedMemoryUsage);
+					nodeGPUInfoMap.get(deviceId).updateGPUInfo(usedMemoryUsage, cptPsCnt, gpuUtil);
 				}
 			}
 		}
@@ -303,6 +322,7 @@ public class MeLoN_ApplicationMaster {
 						e.printStackTrace();
 					}
 					logMonitoredInfo();
+					LOG.info("***gpuDeviceAllocating...");
 					allAlloc = gpuDeviceAllocating();
 
 					if (appExecutionType.equals("amtest")) {
@@ -353,6 +373,7 @@ public class MeLoN_ApplicationMaster {
 				LOG.error("Thread interrupted", e);
 			}
 		}
+		long finished = System.currentTimeMillis();
 		nmClientAsync.stop();
 		amRMClient.unregisterApplicationMaster(FinalApplicationStatus.SUCCEEDED, "Application complete!", null);
 		amRMClient.stop();
@@ -363,16 +384,49 @@ public class MeLoN_ApplicationMaster {
 		} else {
 			LOG.info("Training finished successfully!");
 		}
+		LOG.info("Total executing time : {} sec", (finished-started)/1000);
 		return status == FinalApplicationStatus.SUCCEEDED;
 	}
 
 	private boolean gpuDeviceAllocating() {
 		boolean allAlloc = true;
+		LOG.info("=================================");
+		LOG.info("***GPU allocation mode is {}", gpuAllocMode);
+		LOG.info("=================================");
 		for (GPURequest gpuReq : gpuDeviceAllocInfo) {
 			String allocDevice = null;
 			int allocDeviceMemoryTotal = 0;
 			int allocDeviceMemoryFree = 0;
-			if (gpuAllocMode.equals("WORST")) {
+			int allocDeviceGPUUtil = 100;
+			int allocDeviceCPC = 100;
+			if (gpuAllocMode.equals("CORE_WORST")) {
+				for (String deviceId : nodeGPUInfoMap.keySet()) {
+					if(nodeGPUInfoMap.get(deviceId).getGpuUtil() < (allocDeviceGPUUtil + 5)
+							&& nodeGPUInfoMap.get(deviceId).getComputeProcessCount() < allocDeviceCPC
+							&& nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
+						allocDevice = nodeGPUInfoMap.get(deviceId).getDeviceId();
+						allocDeviceMemoryTotal = nodeGPUInfoMap.get(deviceId).getTotal(); 
+						allocDeviceMemoryFree = nodeGPUInfoMap.get(deviceId).getFree();
+						allocDeviceCPC = nodeGPUInfoMap.get(deviceId).getComputeProcessCount();
+						allocDeviceGPUUtil = nodeGPUInfoMap.get(deviceId).getGpuUtil();
+					}
+				}
+			}else if (gpuAllocMode.equals("ADVANCED_WORST")) {
+				for (String deviceId : nodeGPUInfoMap.keySet()) {
+					if (nodeGPUInfoMap.get(deviceId).getFree() > allocDeviceMemoryFree
+							&& nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
+						if(nodeGPUInfoMap.get(deviceId).getGpuUtil() < (allocDeviceGPUUtil + 5)
+								&& nodeGPUInfoMap.get(deviceId).getComputeProcessCount() < allocDeviceCPC) {
+							allocDevice = nodeGPUInfoMap.get(deviceId).getDeviceId();
+							allocDeviceMemoryTotal = nodeGPUInfoMap.get(deviceId).getTotal();
+							allocDeviceMemoryFree = nodeGPUInfoMap.get(deviceId).getFree();
+							allocDeviceCPC = nodeGPUInfoMap.get(deviceId).getComputeProcessCount();
+							allocDeviceGPUUtil = nodeGPUInfoMap.get(deviceId).getGpuUtil();
+						}
+					}
+				}
+				
+			} else if (gpuAllocMode.equals("WORST")) {
 				for (String deviceId : nodeGPUInfoMap.keySet()) {
 					if (nodeGPUInfoMap.get(deviceId).getFree() > allocDeviceMemoryFree
 							&& nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
@@ -407,21 +461,12 @@ public class MeLoN_ApplicationMaster {
 			LOG.info("allocDevice = {}, allocDeviceFree = {}/{}", allocDevice, allocDeviceMemoryFree,
 					allocDeviceMemoryTotal);
 			if ((int) (gpuReq.getRequiredGPUMemory() * 1.1) <= 0) {
-				// entry.put("DEVICE", "none");
-				// entry.put("DEVICE_TOTAL_GPU_MEMORY", "none");
-				// entry.put("STATUS", "ready");
 				gpuReq.setStatusReady();
 			} else if ((int) (gpuReq.getRequiredGPUMemory() * 1.1) < allocDeviceMemoryFree) {
-				// entry.put("DEVICE", allocDevice);
-				// entry.put("DEVICE_TOTAL_GPU_MEMORY", String.valueOf(allocDeviceMemoryTotal));
-				// entry.put("STATUS", "ready");
 				gpuReq.deviceAlloc(nodeGPUInfoMap.get(allocDevice));
 				nodeGPUInfoMap.get(allocDevice).allocateMemory((int) (gpuReq.getRequiredGPUMemory() * 1.1),
 						gpuReq.getRequestTask());
 			} else {
-				// entry.put("DEVICE", null);
-				// entry.put("DEVICE_TOTAL_GPU_MEMORY", null);
-				// entry.put("STATUS", "non-ready");
 				gpuReq.setStatusNotReady();
 				allAlloc = false;
 			}
@@ -490,8 +535,13 @@ public class MeLoN_ApplicationMaster {
 		}
 		ContainerRequest containerAsk;
 		if (requested) {
-			containerAsk = new ContainerRequest(capability, node, null, priority, false);
-			LOG.info("Requested container ask: " + containerAsk.toString());
+			if(node != null) {
+				containerAsk = new ContainerRequest(capability, node, null, priority, false);
+				LOG.info("Requested container ask: " + containerAsk.toString());
+			}else {
+				containerAsk = new ContainerRequest(capability, null, null, priority, true);
+				LOG.info("Requested container ask: " + containerAsk.toString());
+			}
 		} else {
 			containerAsk = null;
 		}
@@ -661,6 +711,7 @@ public class MeLoN_ApplicationMaster {
 			// String.valueOf(appSession.sessionId));
 
 			containerLaunchEnvs.put("APP_EXECUTION_TYPE", appExecutionType);
+			containerLaunchEnvs.put("APP_ID", appIdString);
 
 			containerLaunchEnvs.putAll(getGPUDeviceEnv(container, task));
 
@@ -679,8 +730,8 @@ public class MeLoN_ApplicationMaster {
 
 			List<String> vargs = new ArrayList<>();
 			vargs.add(rpcServer.getTaskCommand());
-			vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/te.stdout");
-			vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/te.stderr");
+			vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/melon.stdout");
+			vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + "/melon.stderr");
 			String command = String.join(" ", vargs);
 			List<String> commands = new ArrayList<String>();
 			commands.add(command);

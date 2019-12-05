@@ -17,16 +17,21 @@ public class GPUDeviceInfo {
 	
 	private List<String> allocatedTask;
 	
-	public GPUDeviceInfo(String deviceHost, int deviceNum, int total, int used){
+	private int computeProcessCount;
+	private int gpuUtil;
+	
+	public GPUDeviceInfo(String deviceHost, int deviceNum, int total, int used, int cpc, int gpuUtil){
 		this.deviceHost = deviceHost;
 		this.deviceNum = deviceNum;
 		this.deviceId = deviceHost + ":" + deviceNum;
 		this.total = total;
 		this.used = used;
-		this.free = total - free;
+		this.free = total - used;
 		this.allocated = 0;
 		this.nonAllocated = total - this.allocated;
 		this.allocatedTask = new ArrayList<>();
+		this.computeProcessCount = cpc;
+		this.gpuUtil = gpuUtil;
 	}
 	
 	private void computeNonAllocatedMemory() {
@@ -54,11 +59,26 @@ public class GPUDeviceInfo {
 	}
 
 	public int getFree() {
-		return free;
+		return free - allocated;
 	}
 
 	public int getNonAllocated() {
 		return nonAllocated;
+	}
+
+	public int getComputeProcessCount() {
+		return computeProcessCount;
+	}
+
+	public int getGpuUtil() {
+		return gpuUtil;
+	}
+
+	public void updateGPUInfo(int used, int cptPsCnt, int gpuUtil) {
+		this.used = used;
+		this.free = this.total - used;
+		this.computeProcessCount = cptPsCnt;
+		this.gpuUtil = gpuUtil;
 	}
 
 	public void updateMemoryUsage(int used) {

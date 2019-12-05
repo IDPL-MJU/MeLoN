@@ -109,6 +109,7 @@ public class Utils {
 					for (FileStatus fileStatus : ls) {
 						// We only add first level files.
 						if (!fileStatus.isDirectory()) {
+							LOG.info("***file is dir : " + fileStatus.getPath().toString() + " " + fs);
 							addResource(fileStatus.getPath().toString(), localResources, fs);
 						}
 					}

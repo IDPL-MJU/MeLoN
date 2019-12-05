@@ -428,9 +428,9 @@ public class MeLoN_Client {
 		vargs.add("-Xmx" + (int) amMemory + "m");
 		vargs.add(melonAMClass);
 		vargs.add("1>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + File.separatorChar
-				+ "/am.stdout");
+				+ "/melon.stdout");
 		vargs.add("2>" + ApplicationConstants.LOG_DIR_EXPANSION_VAR + File.separatorChar
-				+ "/am.stderr");
+				+ "/melon.stderr");
 		String command = String.join(" ", vargs);
 		List<String> commands = new ArrayList<String>();
 		commands.add(command);

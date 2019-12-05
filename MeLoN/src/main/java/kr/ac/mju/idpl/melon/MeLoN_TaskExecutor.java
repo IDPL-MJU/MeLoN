@@ -22,6 +22,9 @@ import kr.ac.mju.idpl.melon.util.Utils;
 public class MeLoN_TaskExecutor {
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_TaskExecutor.class);
 	private Configuration melonConf = new Configuration(false);
+	private String host = System.getenv(ApplicationConstants.Environment.NM_HOST.name());
+	private String device;
+	private String fraction;
 	private String jobName;
 	private int taskIndex;
 	private int numTasks;
@@ -38,6 +41,14 @@ public class MeLoN_TaskExecutor {
 	private Configuration hdfsConf = new Configuration(false);
 	private int exitCode = -1;
 	private String appExecutionType;
+	
+	private long processStartTime;
+	private long processingFinishTime;
+	private long processExecutingTime;
+	
+	private long containerStartTime;
+	private long containerFinishTime;
+	private long containerExecutingTime;
 
 	public MeLoN_TaskExecutor() {
 		appExecutionType = System.getenv("APP_EXECUTION_TYPE");
@@ -58,6 +69,7 @@ public class MeLoN_TaskExecutor {
 	}
 
 	private int run() throws Exception {
+		containerStartTime = System.currentTimeMillis();
 		initConfigs();
 		Utils.extractResources();
 
@@ -86,12 +98,18 @@ public class MeLoN_TaskExecutor {
 		shellEnvs.put("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/hadoop/anaconda3/bin:/usr/java/bin");
 		shellEnvs.put("LD_LIBRARY_PATH", "/usr/local/cuda-10.0/lib64");
 		shellEnvs.put("CUDA_DEVICE_ORDER", "PCI_BUS_ID");
+		shellEnvs.put("APP_ID", System.getenv("APP_ID"));
 		if(System.getenv("CUDA_VISIBLE_DEVICES") != null) {
 			shellEnvs.put("CUDA_VISIBLE_DEVICES", System.getenv("CUDA_VISIBLE_DEVICES"));
+		}else {
+			shellEnvs.put("CUDA_VISIBLE_DEVICES", "");
 		}
 		if(System.getenv("FRACTION") != null) {
 			shellEnvs.put("FRACTION", System.getenv("FRACTION"));
 		}
+		device = shellEnvs.get("CUDA_VISIBLE_DEVICES");
+		fraction = shellEnvs.get("FRACTION");
+		
 		LOG.info("***CUDA_VISIBLE_DEVICES = {}", System.getenv("CUDA_VISIBLE_DEVICES"));
 		LOG.info("***FRACTION = {}", System.getenv("FRACTION"));
 		
@@ -102,18 +120,21 @@ public class MeLoN_TaskExecutor {
 
 		exitCode = executeShell();
 		LOG.info("***Task = {}:{}, Device = {}:{}", String.valueOf(jobName), String.valueOf(taskIndex), 
-				System.getenv(ApplicationConstants.Environment.NM_HOST.name()),
+				host,
 				System.getenv("CUDA_VISIBLE_DEVICES"));
 		LOG.info("Execute shell is finished with exitcode {}", exitCode);
+		containerFinishTime = System.currentTimeMillis();
+		containerExecutingTime = containerFinishTime - containerStartTime;
 		//registerExecutionResult();
 		return exitCode;
 	}
-
+	
 	private void registerExecutionResult() throws Exception {
 		String response;
 		int attempt = 60;
+		ExecutorExecutionResult result = new ExecutorExecutionResult(exitCode, host, device, fraction, jobName, taskIndex, containerExecutingTime, processExecutingTime);
 		while (attempt > 0) {
-			response = amClient.registerExecutionResult(exitCode, jobName, String.valueOf(taskIndex));
+			response = amClient.registerExecutionResult(result);
 			if (response != null) {
 				LOG.info("AM response for result execution run: " + response);
 				break;
@@ -135,7 +156,7 @@ public class MeLoN_TaskExecutor {
 			}
 		}
 		
-		taskCommand += "; rm -r ./*";
+		//taskCommand += "; rm -r ./*";
 		LOG.info("Executing command: " + taskCommand);
 		ProcessBuilder taskProcessBuilder = new ProcessBuilder("bash", "-c", taskCommand);
 		taskProcessBuilder.redirectError(ProcessBuilder.Redirect.INHERIT);
@@ -145,8 +166,11 @@ public class MeLoN_TaskExecutor {
 		if (shellEnvs != null) {
 			taskProcessBuilder.environment().putAll(shellEnvs);
 		}
+		processStartTime = System.currentTimeMillis();
 		Process taskProcess = taskProcessBuilder.start();
 		taskProcess.waitFor();
+		processingFinishTime = System.currentTimeMillis();
+		processExecutingTime = processingFinishTime - processStartTime;
 		return taskProcess.exitValue();
 	}
 

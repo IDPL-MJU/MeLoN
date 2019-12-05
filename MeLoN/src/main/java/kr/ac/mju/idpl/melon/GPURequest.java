@@ -36,7 +36,7 @@ public class GPURequest {
 	}
 	
 	public String getFraction() {
-		return "0." + (int) (this.requiredGPUMemory * 1000 / this.device.getTotal());
+		return "0." + String.format("%03d", (int) (this.requiredGPUMemory * 1000 / this.device.getTotal()));
 	}
 
 	public void setStatusReady() {
