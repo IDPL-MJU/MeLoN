@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import kr.ac.mju.idpl.melon.rpc.RPCProtocol;
+import kr.ac.mju.idpl.melon.MeLoN_Constants.AppExecutionType;
 import kr.ac.mju.idpl.melon.util.Utils;
 
 public class MeLoN_TaskExecutor {
@@ -40,18 +41,18 @@ public class MeLoN_TaskExecutor {
 	private Configuration yarnConf = new Configuration(false);
 	private Configuration hdfsConf = new Configuration(false);
 	private int exitCode = -1;
-	private String appExecutionType;
+	private AppExecutionType appExecutionType;
 	
 	private long processStartTime;
 	private long processingFinishTime;
-	private long processExecutingTime;
+	private long processExecutionTime;
 	
-	private long containerStartTime;
-	private long containerFinishTime;
-	private long containerExecutingTime;
+	private long executorStartTime;
+	private long executorFinishTime;
+	private long executorExecutionTime;
 
 	public MeLoN_TaskExecutor() {
-		appExecutionType = System.getenv("APP_EXECUTION_TYPE");
+		appExecutionType = AppExecutionType.valueOf(System.getenv(MeLoN_Constants.APP_EXECUTION_TYPE));
 	}
 
 	public static void main(String[] args) {
@@ -69,23 +70,23 @@ public class MeLoN_TaskExecutor {
 	}
 
 	private int run() throws Exception {
-		containerStartTime = System.currentTimeMillis();
+		executorStartTime = System.currentTimeMillis();
 		initConfigs();
 		Utils.extractResources();
 
 		LOG.info("This container's jobName is {}", jobName);
-		if(appExecutionType.equals("distributed")) {
-			InetSocketAddress addr = new InetSocketAddress(amHost, amPort);
-			try {
-				amClient = RPC.getProxy(RPCProtocol.class, RPCProtocol.versionID, addr, yarnConf);
-			} catch (IOException e) {
-				LOG.error("Connecting to ApplicationMaster " + amHost + ":" + amPort + " failed!");
-				LOG.error("Container will suicide!");
-				System.exit(1);
-			}
-			rpcSocket = new ServerSocket(0);
-			rpcPort = rpcSocket.getLocalPort();
-			LOG.info("Reserved rpcPort: " + this.rpcPort);
+		InetSocketAddress addr = new InetSocketAddress(amHost, amPort);
+		try {
+			amClient = RPC.getProxy(RPCProtocol.class, RPCProtocol.versionID, addr, yarnConf);
+		} catch (IOException e) {
+			LOG.error("Connecting to ApplicationMaster " + amHost + ":" + amPort + " failed!");
+			LOG.error("Container will suicide!");
+			System.exit(1);
+		}
+		rpcSocket = new ServerSocket(0);
+		rpcPort = rpcSocket.getLocalPort();
+		LOG.info("Reserved rpcPort: " + this.rpcPort);
+		if(appExecutionType == AppExecutionType.DISTRIBUTED) {
 			clusterSpec = registerAndGetClusterSpec();
 			if (clusterSpec == null) {
 				LOG.error("Failed to register worker with AM.");
@@ -95,23 +96,23 @@ public class MeLoN_TaskExecutor {
 			shellEnvs.put(MeLoN_Constants.CLUSTER_SPEC, String.valueOf(clusterSpec));
 		}
 		
-		shellEnvs.put("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/hadoop/anaconda3/bin:/usr/java/bin");
-		shellEnvs.put("LD_LIBRARY_PATH", "/usr/local/cuda-10.0/lib64");
-		shellEnvs.put("CUDA_DEVICE_ORDER", "PCI_BUS_ID");
-		shellEnvs.put("APP_ID", System.getenv("APP_ID"));
-		if(System.getenv("CUDA_VISIBLE_DEVICES") != null) {
-			shellEnvs.put("CUDA_VISIBLE_DEVICES", System.getenv("CUDA_VISIBLE_DEVICES"));
+		shellEnvs.put(MeLoN_Constants.PATH, "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/hadoop/anaconda3/bin:/usr/java/bin");
+		shellEnvs.put(MeLoN_Constants.LD_LIBRARY_PATH, "/usr/local/cuda-10.0/lib64");
+		shellEnvs.put(MeLoN_Constants.CUDA_DEVICE_ORDER, "PCI_BUS_ID");
+		shellEnvs.put(MeLoN_Constants.APP_ID, System.getenv(MeLoN_Constants.APP_ID));
+		if(System.getenv(MeLoN_Constants.CUDA_VISIBLE_DEVICES) != null) {
+			shellEnvs.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, System.getenv(MeLoN_Constants.CUDA_VISIBLE_DEVICES));
 		}else {
-			shellEnvs.put("CUDA_VISIBLE_DEVICES", "");
+			shellEnvs.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, "");
 		}
-		if(System.getenv("FRACTION") != null) {
-			shellEnvs.put("FRACTION", System.getenv("FRACTION"));
+		if(System.getenv(MeLoN_Constants.FRACTION) != null) {
+			shellEnvs.put(MeLoN_Constants.FRACTION, System.getenv(MeLoN_Constants.FRACTION));
 		}
-		device = shellEnvs.get("CUDA_VISIBLE_DEVICES");
-		fraction = shellEnvs.get("FRACTION");
+		device = shellEnvs.get(MeLoN_Constants.CUDA_VISIBLE_DEVICES);
+		fraction = shellEnvs.get(MeLoN_Constants.FRACTION);
 		
-		LOG.info("***CUDA_VISIBLE_DEVICES = {}", System.getenv("CUDA_VISIBLE_DEVICES"));
-		LOG.info("***FRACTION = {}", System.getenv("FRACTION"));
+		LOG.info("***CUDA_VISIBLE_DEVICES = {}", device);
+		LOG.info("***FRACTION = {}", fraction);
 		
 		shellEnvs.put(MeLoN_Constants.JOB_NAME, String.valueOf(jobName));
 		shellEnvs.put(MeLoN_Constants.TASK_INDEX, String.valueOf(taskIndex));
@@ -123,30 +124,31 @@ public class MeLoN_TaskExecutor {
 				host,
 				System.getenv("CUDA_VISIBLE_DEVICES"));
 		LOG.info("Execute shell is finished with exitcode {}", exitCode);
-		containerFinishTime = System.currentTimeMillis();
-		containerExecutingTime = containerFinishTime - containerStartTime;
-		//registerExecutionResult();
+		executorFinishTime = System.currentTimeMillis();
+		executorExecutionTime = executorFinishTime - executorStartTime;
+		registerExecutionResult();
 		return exitCode;
 	}
 	
 	private void registerExecutionResult() throws Exception {
 		String response;
 		int attempt = 60;
-		ExecutorExecutionResult result = new ExecutorExecutionResult(exitCode, host, device, fraction, jobName, taskIndex, containerExecutingTime, processExecutingTime);
+//		ExecutorExecutionResult result = new ExecutorExecutionResult(exitCode, host, device, fraction, jobName, taskIndex, executorExecutionTime, processExecutionTime);
 		while (attempt > 0) {
-			response = amClient.registerExecutionResult(result);
+//			response = amClient.registerExecutionResult(result);
+			response = amClient.registerExecutionResult(exitCode, host, device, fraction, jobName, taskIndex, executorExecutionTime, processExecutionTime);
 			if (response != null) {
 				LOG.info("AM response for result execution run: " + response);
 				break;
 			}
-			Thread.sleep(1000);
+			Thread.sleep(3000);
 			attempt--;
 		}
 	}
 
 	private int executeShell() throws IOException, InterruptedException {
 		LOG.info("Executing command: " + taskCommand);
-		if (!appExecutionType.equals("shelltest")) {
+		if (appExecutionType != AppExecutionType.TEST_SHELL) {
 			String executablePath = taskCommand.trim().split(" ")[0];
 			File executable = new File(executablePath);
 			if (!executable.canExecute()) {
@@ -155,7 +157,8 @@ public class MeLoN_TaskExecutor {
 				}
 			}
 		}
-		
+
+		taskCommand = "unzip -o venv.zip -d ./venv;" + taskCommand;
 		//taskCommand += "; rm -r ./*";
 		LOG.info("Executing command: " + taskCommand);
 		ProcessBuilder taskProcessBuilder = new ProcessBuilder("bash", "-c", taskCommand);
@@ -170,7 +173,7 @@ public class MeLoN_TaskExecutor {
 		Process taskProcess = taskProcessBuilder.start();
 		taskProcess.waitFor();
 		processingFinishTime = System.currentTimeMillis();
-		processExecutingTime = processingFinishTime - processStartTime;
+		processExecutionTime = processingFinishTime - processStartTime;
 		return taskProcess.exitValue();
 	}
 

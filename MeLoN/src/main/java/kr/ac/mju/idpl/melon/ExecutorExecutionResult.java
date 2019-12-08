@@ -9,10 +9,10 @@ public class ExecutorExecutionResult {
 	private String fraction;
 	private String jobName;
 	private int taskIndex;
-	private long containerExecutingTime;
-	private long processExecutingTime;
+	private long executorExecutionTime;
+	private long processExecutionTime;
 	public ExecutorExecutionResult(int exitCode, String host, String device, String fraction, String jobName,
-			int taskIndex, long containerExecutingTime, long processExecutingTime) {
+			int taskIndex, long executorExecutionTime, long processExecutionTime) {
 		super();
 		this.exitCode = exitCode;
 		this.host = host;
@@ -20,8 +20,8 @@ public class ExecutorExecutionResult {
 		this.fraction = fraction;
 		this.jobName = jobName;
 		this.taskIndex = taskIndex;
-		this.containerExecutingTime = containerExecutingTime;
-		this.processExecutingTime = processExecutingTime;
+		this.executorExecutionTime = executorExecutionTime;
+		this.processExecutionTime = processExecutionTime;
 	}
 	public int getExitCode() {
 		return exitCode;
@@ -44,11 +44,11 @@ public class ExecutorExecutionResult {
 	public String getTaskId() {
 		return jobName + ":" + taskIndex;
 	}
-	public long getContainerExecutingTime() {
-		return containerExecutingTime;
+	public long getExecutorExecutionTime() {
+		return executorExecutionTime;
 	}
-	public long getProcessExecutingTime() {
-		return processExecutingTime;
+	public long getProcessExecutionTime() {
+		return processExecutionTime;
 	}
 	
 }

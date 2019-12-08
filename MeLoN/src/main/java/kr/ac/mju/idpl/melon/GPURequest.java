@@ -66,12 +66,22 @@ public class GPURequest {
 	public boolean isAllocated() {
 		return this.requestStatus == Status.ALLOCATED;
 	}
+	
+	public boolean isDeviceAllocated() {
+		return this.device != null;
+	}
 	public void deviceAlloc(GPUDeviceInfo device) {
 		this.device = device;
 		setStatusReady();
 	}
 	
+	public void deviceDealloc() {
+		this.device = null;
+		setStatusNotReady();
+	}
+	
 	public void resetRequest() {
+		this.device.deallocateMemory((int) (this.requiredGPUMemory * 1.1), this.requestTask);
 		this.device = null;
 		setStatusNotReady();
 	}

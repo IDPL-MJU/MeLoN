@@ -57,8 +57,8 @@ public class RPCServer extends Thread implements RPCProtocol {
 	// application information
 	private int sessionId;
 	private String appId;
-	private long startingTime;
-	private long finishingTime;
+	private long startTime;
+	private long finishTime;
 	private String jvmArgs;
 	private Configuration melonConf;
 	private Map<ContainerId, MeLoN_Task> containerIdMap = new HashMap<>();
@@ -73,17 +73,30 @@ public class RPCServer extends Thread implements RPCProtocol {
 	public RPCServer(Builder builder) {
 		this.jvmArgs = builder.jvmArgs;
 		this.containerRequests = Utils.parseContainerRequests(builder.melonConf);
+		reset();
+		this.melonConf = builder.melonConf;
+		this.rpcAddress = builder.hostname;
+		this.rpcPort = 10000 + RANDOM_NUMBER_GENERATOR.nextInt(5000) + 1;
+		this.yarnConf = builder.yarnConf;
+		
+		this.sessionId = 0;
+	}
+	
+	public void reset() {
+		sessionId++;
 		for (Map.Entry<String, MeLoN_ContainerRequest> entry : containerRequests.entrySet()) {
 			LOG.info("jobtasks put request : " + entry.getValue().getJobName() + " - mem:"
 					+ entry.getValue().getMemory() + ", vcores:" + entry.getValue().getvCores());
 			jobTasks.put(entry.getKey(), new MeLoN_Task[entry.getValue().getNumInstances()]);
 		}
-		this.melonConf = builder.melonConf;
-		this.rpcAddress = builder.hostname;
-		this.rpcPort = 10000 + RANDOM_NUMBER_GENERATOR.nextInt(5000) + 1;
-		this.yarnConf = builder.yarnConf;
+		containerIdMap = new HashMap<>();
+		registeredTasks = new HashSet<>();
 	}
 
+	public int getSessionId() {
+		return this.sessionId;
+	}
+	
 	public String getTaskCommand() {
 		StringJoiner cmd = new StringJoiner(" ");
 		cmd.add("$JAVA_HOME/bin/java").add(jvmArgs).add(MeLoN_TaskExecutor.class.getName());
@@ -115,7 +128,7 @@ public class RPCServer extends Thread implements RPCProtocol {
 			MeLoN_Task[] tasks = jobTasks.get(jobName);
 			for (int i = 0; i < tasks.length; i++) {
 				if (tasks[i] == null) {
-					tasks[i] = new MeLoN_Task(jobName, String.valueOf(i));
+					tasks[i] = new MeLoN_Task(jobName, String.valueOf(i), sessionId);
 					return tasks[i];
 				}
 			}
@@ -292,9 +305,10 @@ public class RPCServer extends Thread implements RPCProtocol {
 		containerIdMap.put(containerId, task);
 	}
 	
-	public Map<String, ExecutorExecutionResult> getExecutorExecutionResult() {
+	public Map<String, ExecutorExecutionResult> getExecutorExecutionResults() {
 		return results;
 	}
+
 
 	public void run() {
 		LOG.info("Running RPCServer ...");
@@ -364,10 +378,12 @@ public class RPCServer extends Thread implements RPCProtocol {
 	}
 
 	@Override
-	public String registerExecutionResult(ExecutorExecutionResult result) throws Exception {
-		LOG.info("Received result registration request with exit code " + result.getExitCode() + " from " + result.getJobName() + " "
-				+ result.getTaskIndex());
+	public String registerExecutionResult(int exitCode, String host, String device, String fraction, String jobName,
+			int taskIndex, long executorExecutionTime, long processExecutionTime) throws Exception {
+		LOG.info("Received result registration request with exit code " + exitCode + " from " + jobName + " " + taskIndex);
+		ExecutorExecutionResult result = new ExecutorExecutionResult(exitCode, host, device, fraction, jobName, taskIndex, executorExecutionTime, processExecutionTime);
 		results.put(result.getTaskId(), result);
+		LOG.info("Result put");
 		MeLoN_Task task = getTask(result.getJobName(), String.valueOf(result.getTaskIndex()));
 		return "RECEIVED";
 	}

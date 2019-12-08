@@ -39,4 +39,15 @@ public class MeLoN_Constants {
 
 	public static final String AM_HOST = "AM_HOST";
 	public static final String AM_PORT = "AM_PORT";
+	public static final String APP_EXECUTION_TYPE = "APP_EXECUTION_TYPE";
+	public static final String APP_ID = "APP_ID";
+
+	public static final String PATH = "PATH";
+	public static final String LD_LIBRARY_PATH = "LD_LIBRARY_PATH";
+	public static final String CUDA_DEVICE_ORDER = "CUDA_DEVICE_ORDER";
+	public static final String CUDA_VISIBLE_DEVICES = "CUDA_VISIBLE_DEVICES";
+	public static final String FRACTION = "FRACTION";
+	public enum AppExecutionType {BATCH, DISTRIBUTED, TEST_CLIENT, TEST_AM, TEST_SHELL}
+	public enum GPUAllocMode {WHOLE, BEST, WORST, CORE_WORST, ADVANCED_WORST}
+	
 }

@@ -73,6 +73,10 @@ public class GPUDeviceInfo {
 	public int getGpuUtil() {
 		return gpuUtil;
 	}
+	
+	public void plusComputeProcessCount() {
+		this.computeProcessCount++;
+	}
 
 	public void updateGPUInfo(int used, int cptPsCnt, int gpuUtil) {
 		this.used = used;

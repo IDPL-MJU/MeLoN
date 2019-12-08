@@ -24,6 +24,8 @@ public class MeLoN_ConfigurationKeys {
 	public static final String APPLICATION_NAME_DEFAULT = "melon";
 	public static final String HDFS_CONF_PATH = MELON_PREFIX + APPLICATION_PREFIX + "hdfs-conf-path";
 	public static final String YARN_CONF_PATH = MELON_PREFIX + APPLICATION_PREFIX + "yarn-conf-path";
+	public static final String EXECUTION_TYPE = MELON_PREFIX + APPLICATION_PREFIX + "execution-type";
+	public static final String GPU_ALLOCATION_MODE = MELON_PREFIX + APPLICATION_PREFIX + "gpu-alloc";
 
 	public static final String PYTHON_VENV = APPLICATION_PREFIX + "python-venv";
 	public static final String PYTHON_BIN_PATH = APPLICATION_PREFIX + "python-bin-path";

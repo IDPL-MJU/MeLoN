@@ -57,6 +57,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import kr.ac.mju.idpl.melon.MeLoN_Constants;
+import kr.ac.mju.idpl.melon.MeLoN_Constants.*;
 import kr.ac.mju.idpl.melon.util.Utils;
 import kr.ac.mju.idpl.melon.MeLoN_ApplicationMaster;
 import kr.ac.mju.idpl.melon.MeLoN_Client;
@@ -64,8 +65,8 @@ import kr.ac.mju.idpl.melon.MeLoN_Client;
 public class MeLoN_Client {
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_Client.class);
 
-	private String appExecutionType = null;
-	private String gpuAllocMode = null;
+	private AppExecutionType appExecutionType = null;
+	private GPUAllocMode gpuAllocMode = null;
 	// Configurations
 	private YarnClient yarnClient;
 	private YarnConfiguration yarnConf;
@@ -107,8 +108,8 @@ public class MeLoN_Client {
 		hdfsConf = new Configuration();
 		melonConf = new Configuration(false);
 		yarnClient = YarnClient.createYarnClient();
-		String appExecutionType = "distributed";
-		String gpuAllocMode = "WORST";
+		appExecutionType = AppExecutionType.DISTRIBUTED;
+		gpuAllocMode = GPUAllocMode.WORST;
 	}
 
 	private void initHdfsConf() {
@@ -154,7 +155,7 @@ public class MeLoN_Client {
 		opts.addOption("src_dir", true, "Name of directory of source files. Default : src");
 		opts.addOption("jar", true, "JAR file containing the application master. Default : melon.jar");
 		opts.addOption("test_shell", true, "The distributed shell commnad for all container.");
-		opts.addOption("app_execution_type", true, "Batch - batch, Distributed - distributed, Test - clienttest/amtest/shelltest. Default : distributed");
+		opts.addOption("app_execution_type", true, "Batch - BATCH, Distributed - DISTRIBUTED, Test - TEST_CLIENT/TEST_AM/TEST_SHELL. Default : DISTRIBUTED");
 		opts.addOption("gpu_alloc_mode", true, "(WORST, BEST)");
 		opts.addOption("help", false, "Print usage.");
 	}
@@ -216,8 +217,8 @@ public class MeLoN_Client {
 		executes = buildTaskCommand(pythonVenv, pythonBinaryPath, cliParser.getOptionValue("executes"), taskParams);
 		
 		if (cliParser.hasOption("app_execution_type")) {
-			appExecutionType = cliParser.getOptionValue("app_execution_type");
-			if(appExecutionType.equals("shelltest")) {
+			appExecutionType = AppExecutionType.valueOf(cliParser.getOptionValue("app_execution_type"));
+			if(appExecutionType == AppExecutionType.TEST_SHELL) {
 				if (cliParser.hasOption("test_shell")) {
 					executes = cliParser.getOptionValue("test_shell");
 				}else {
@@ -225,12 +226,12 @@ public class MeLoN_Client {
 				}
 			}
 		}
-		melonConf.set("melon.application.execution-type", appExecutionType);
+		melonConf.set(MeLoN_ConfigurationKeys.EXECUTION_TYPE, appExecutionType.name());
 		
 		if (cliParser.hasOption("gpu_alloc_mode")) {
-			gpuAllocMode = cliParser.getOptionValue("gpu_alloc_mode");
+			gpuAllocMode = GPUAllocMode.valueOf(cliParser.getOptionValue("gpu_alloc_mode"));
 		}
-		melonConf.set("melon.application.gpu-alloc", gpuAllocMode);
+		melonConf.set(MeLoN_ConfigurationKeys.GPU_ALLOCATION_MODE, gpuAllocMode.name());
 
 		melonConf.set(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND, executes);
 
@@ -406,7 +407,7 @@ public class MeLoN_Client {
 		amContainer.setEnvironment(containerEnvs);
 		amContainer.setCommands(buildAMCommand());
 
-		if(appExecutionType.equals("clienttest")) {
+		if(appExecutionType == AppExecutionType.TEST_CLIENT) {
 			return 0;
 		}
 		
@@ -417,8 +418,8 @@ public class MeLoN_Client {
 		LOG.info("Submitting YARN application" + "[" + appId + "]");
 		yarnClient.submitApplication(appContext);
 		LOG.info("***melonFinalConf : " + melonConf.getValByRegex("melon\\.([a-z]+)\\.([a-z]+)"));
-		// ApplicationReport report = yarnClient.getApplicationReport(appId);
-		// return monitorApplication();
+		ApplicationReport report = yarnClient.getApplicationReport(appId);
+		//return monitorApplication();
 		return 0;
 	}
 
@@ -599,7 +600,7 @@ public class MeLoN_Client {
 	private int monitorApplication() throws YarnException, IOException {
 		while (true) {
 			try {
-				Thread.sleep(5000);
+				Thread.sleep(30000);
 			} catch (InterruptedException e) {
 
 			}

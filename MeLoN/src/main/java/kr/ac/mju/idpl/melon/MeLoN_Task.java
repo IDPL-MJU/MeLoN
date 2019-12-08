@@ -4,6 +4,7 @@ import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerExitStatus;
 
 public class MeLoN_Task {
+	private int sessionId;
 	private String jobName;
 	private String taskIndex;
 	private String taskUrl;
@@ -18,9 +19,14 @@ public class MeLoN_Task {
 		return completed;
 	}
 
-	public MeLoN_Task(String jobName, String taskIndex) {
+	public MeLoN_Task(String jobName, String taskIndex, int sessionId) {
 		this.jobName = jobName;
 		this.taskIndex = taskIndex;
+		this.sessionId = sessionId;
+	}
+
+	public int getSessionId() {
+		return sessionId;
 	}
 
 	public String getJobName() {

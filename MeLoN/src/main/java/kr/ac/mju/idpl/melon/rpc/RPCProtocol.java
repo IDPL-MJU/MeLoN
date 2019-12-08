@@ -21,6 +21,7 @@ public interface RPCProtocol extends VersionedProtocol {
 	
 	public String getClusterSpec() throws IOException, YarnException;
 	
-	public String registerExecutionResult(ExecutorExecutionResult ers) throws Exception;
+	public String registerExecutionResult(int exitCode, String host, String device, String fraction, String jobName,
+			int taskIndex, long executorExecutionTime, long processExecutionTime) throws Exception;
 	
 }
