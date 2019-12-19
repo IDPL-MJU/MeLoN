@@ -111,7 +111,9 @@ public class MeLoN_TaskExecutor {
 		device = shellEnvs.get(MeLoN_Constants.CUDA_VISIBLE_DEVICES);
 		fraction = shellEnvs.get(MeLoN_Constants.FRACTION);
 		
-		LOG.info("***CUDA_VISIBLE_DEVICES = {}", device);
+		LOG.info("***:wq"
+				+ ":wq"
+				+ " = {}", device);
 		LOG.info("***FRACTION = {}", fraction);
 		
 		shellEnvs.put(MeLoN_Constants.JOB_NAME, String.valueOf(jobName));
@@ -158,7 +160,7 @@ public class MeLoN_TaskExecutor {
 			}
 		}
 
-		taskCommand = "unzip -o venv.zip -d ./venv;" + taskCommand;
+		//taskCommand = "unzip -o venv.zip -d ./venv;" + taskCommand;
 		//taskCommand += "; rm -r ./*";
 		LOG.info("Executing command: " + taskCommand);
 		ProcessBuilder taskProcessBuilder = new ProcessBuilder("bash", "-c", taskCommand);

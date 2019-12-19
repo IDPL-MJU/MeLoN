@@ -48,6 +48,6 @@ public class MeLoN_Constants {
 	public static final String CUDA_VISIBLE_DEVICES = "CUDA_VISIBLE_DEVICES";
 	public static final String FRACTION = "FRACTION";
 	public enum AppExecutionType {BATCH, DISTRIBUTED, TEST_CLIENT, TEST_AM, TEST_SHELL}
-	public enum GPUAllocMode {WHOLE, BEST, WORST, CORE_WORST, ADVANCED_WORST}
+	public enum GPUAllocMode {WHOLE, BEST, WORST, MELON, ADVANCED_WORST}
 	
 }

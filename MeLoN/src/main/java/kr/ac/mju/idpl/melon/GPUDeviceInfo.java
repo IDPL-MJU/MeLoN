@@ -76,6 +76,7 @@ public class GPUDeviceInfo {
 	
 	public void plusComputeProcessCount() {
 		this.computeProcessCount++;
+		this.gpuUtil++;
 	}
 
 	public void updateGPUInfo(int used, int cptPsCnt, int gpuUtil) {
