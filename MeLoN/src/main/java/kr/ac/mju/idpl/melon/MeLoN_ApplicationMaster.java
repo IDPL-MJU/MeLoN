@@ -205,7 +205,7 @@ public class MeLoN_ApplicationMaster {
 		amHostname = System.getenv(ApplicationConstants.Environment.NM_HOST.name());
 		// amHostname = NetUtils.getHostname();
 		rpcServer = new RPCServer.Builder().setHostname(amHostname).setYarnConf(yarnConf).build();
-		buildSession();
+		session = buildSession();
 		rpcServer.setNewSession(session);
 		amPort = rpcServer.getRpcPort();
 		containerEnvs.put(MeLoN_Constants.AM_HOST, amHostname);
@@ -239,32 +239,22 @@ public class MeLoN_ApplicationMaster {
 		rpcServer.reset();
 		nodeGPUInfoMap.clear();
 		while (!done) {
-			while (!allReq) {
-				while (!allAlloc) {
-					LOG.info("***==========Updating GPU Resource Info...==========");
-					try {
-						gpuAllocator.updateGPUDeviceInfo();
-					} catch (NumberFormatException | XPathExpressionException | SAXException
-							| ParserConfigurationException e) {
-						e.printStackTrace();
-					}
-					gpuAllocator.logGPUInfo();
+			if (!allReq) {
+				while (!gpuAllocator.isAllAllocated()) {
 					LOG.info("***gpuDeviceAllocating...");
-					allAlloc = gpuAllocator.gpuDeviceAllocating();
-					if (appExecutionType == AppExecutionType.TEST_AM) {
-						LOG.info("This application is AMTest mode. Application will be finished.");
-						return true;
-					}
-					// if (!allAlloc) {
-					// resetGpuDeviceAllocInfo();
-					// }
-					if (!allAlloc && appExecutionType == AppExecutionType.DISTRIBUTED) {
+					gpuAllocator.gpuDeviceAllocating();
+//					if (appExecutionType == AppExecutionType.TEST_AM) {
+//						LOG.info("This application is AMTest mode. Application will be finished.");
+//						return true;
+//					}
+					if (!gpuAllocator.isAllAllocated() && appExecutionType == AppExecutionType.DISTRIBUTED) {
 						gpuAllocator.resetGpuDeviceAllocInfo();
 					} else if (appExecutionType == AppExecutionType.BATCH) {
 						break;
 					}
 				}
 				LOG.info("***==========Adding Container Requests...==========");
+				LOG.info("***is all allocated? {}", gpuAllocator.isAllAllocated());
 				allReq = true;
 				for (MeLoN_ContainerRequest request : requests) {
 					LOG.info("Requesting container ...");
@@ -279,9 +269,16 @@ public class MeLoN_ApplicationMaster {
 						LOG.info("***addContainerRequest");
 						amRMClient.addContainerRequest(containerAsk);
 						LOG.info("***done");
-					} else {
-						LOG.info("***allReq = false");
-						allReq = false;
+					} else{
+						int requestedNum = 0;
+						for(String jobName : askedContainerMap.keySet()) {
+							LOG.info("***askedContainerMap.get(jobName).size() = {}", askedContainerMap.get(jobName).size());
+							requestedNum += askedContainerMap.get(jobName).size();
+						}
+						LOG.info("***requestd container num = {}", requestedNum);
+						if(requestedNum < requests.size()) {
+							allReq = false;
+						}
 					}
 				}
 			}
@@ -305,6 +302,11 @@ public class MeLoN_ApplicationMaster {
 			}
 		}
 		finishTime = System.currentTimeMillis();
+		ProcessBuilder monitoringProcessBuilder = new ProcessBuilder("sh", "-c",
+				"sshpass -p hadoop ssh -T -oStrictHostKeyChecking=no hadoop@master.hadoop.com "
+				+ "touch /home/hadoop/melon/experiment/result/" + appIdString + "_1_finish");
+		Process monitoringProcess = monitoringProcessBuilder.start();
+		monitoringProcess.waitFor();
 		appExecutionTime = finishTime - appStartTime;
 		nmClientAsync.stop();
 		amRMClient.unregisterApplicationMaster(FinalApplicationStatus.SUCCEEDED, "Application complete!", null);
@@ -357,11 +359,11 @@ public class MeLoN_ApplicationMaster {
 		session.sessionId += 1;
 	}
 	
-	private void buildSession() {
+	private MeLoN_Session buildSession() {
 		this.sessionBuilder = new MeLoN_Session.Builder().setMelonConf(melonConf)
 				.setTaskExecutorJVMArgs(melonConf.get(MeLoN_ConfigurationKeys.TASK_EXECUTOR_JVM_OPTS,
 						MeLoN_ConfigurationKeys.TASK_EXECUTOR_JVM_OPTS_DEFAULT));
-		this.session = sessionBuilder.build();
+		return sessionBuilder.build();
 	}
 
 	private void stopRunningContainers() throws InterruptedException {
@@ -431,25 +433,25 @@ public class MeLoN_ApplicationMaster {
 		}
 	}
 
-	public synchronized Map<String, String> getGPUDeviceEnv(Container container, MeLoN_Task task) {
-		Map<String, String> env = new ConcurrentHashMap<>();
-		for (GPURequest gpuReq : gpuAllocator.getGPUDeviceallocInfo()) {
-			if (gpuReq.getRequestTask().equals(task.getJobName()) && gpuReq.getDevice() != null
-					&& gpuReq.getDevice().getDeviceHost().equals(container.getNodeId().getHost())
-					&& gpuReq.isRequested()) {
-				gpuReq.setStatusAllocated();
-				gpuReq.setContainerId(container.getId());
-				env.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, String.valueOf(gpuReq.getDevice().getDeviceNum()));
-				env.put(MeLoN_Constants.FRACTION, gpuReq.getFraction());
-				LOG.info("\n***Extra envs set." + "\n***Task = " + task.getJobName() + ":" + task.getTaskIndex()
-						+ "\n***Device = " + gpuReq.getDevice().getDeviceId() + ", Using "
-						+ gpuReq.getRequiredGPUMemory() + "/" + gpuReq.getDevice().getTotal() + "MB, Fraction = "
-						+ gpuReq.getFraction() + "\n***ContainerId = " + container.getId());
-				break;
-			}
-		}
-		return env;
-	}
+//	public synchronized Map<String, String> getGPUDeviceEnv(Container container, MeLoN_Task task) {
+//		Map<String, String> env = new ConcurrentHashMap<>();
+//		for (GPURequest gpuReq : gpuAllocator.getGPUDeviceallocInfo()) {
+//			if (gpuReq.getRequestTask().equals(task.getJobName()) && gpuReq.getDevice() != null
+//					&& gpuReq.getDevice().getDeviceHost().equals(container.getNodeId().getHost())
+//					&& gpuReq.isRequested()) {
+//				gpuReq.setStatusAllocated();
+//				gpuReq.setContainerId(container.getId());
+//				env.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, String.valueOf(gpuReq.getDevice().getDeviceNum()));
+//				env.put(MeLoN_Constants.FRACTION, gpuReq.getFraction());
+//				LOG.info("\n***Extra envs set." + "\n***Task = " + task.getJobName() + ":" + task.getTaskIndex()
+//						+ "\n***Device = " + gpuReq.getDevice().getDeviceId() + ", Using "
+//						+ gpuReq.getRequiredGPUMemory() + "/" + gpuReq.getDevice().getTotal() + "MB, Fraction = "
+//						+ gpuReq.getFraction() + "\n***ContainerId = " + container.getId());
+//				break;
+//			}
+//		}
+//		return env;
+//	}
 
 	private class NMCallbackHandler implements NMClientAsync.CallbackHandler {
 
@@ -587,6 +589,7 @@ public class MeLoN_ApplicationMaster {
 		}
 
 		public void run() {
+			LOG.info("***container {} getAndInitMatchingTaskByPriority.", container.getId());
 			MeLoN_Task task = session.getAndInitMatchingTaskByPriority(container.getPriority().getPriority());
 			if (task == null) {
 				LOG.error("Task was null. Nothing to schedule.");
@@ -606,7 +609,7 @@ public class MeLoN_ApplicationMaster {
 			containerLaunchEnvs.put(MeLoN_Constants.APP_EXECUTION_TYPE, appExecutionType.name());
 			containerLaunchEnvs.put(MeLoN_Constants.APP_ID, appIdString);
 
-			containerLaunchEnvs.putAll(getGPUDeviceEnv(container, task));
+			containerLaunchEnvs.putAll(gpuAllocator.getGPUDeviceEnv(container, task));
 
 			// Add job type specific resources
 			Map<String, LocalResource> containerResources = new ConcurrentHashMap<>(localResources);
@@ -654,15 +657,7 @@ public class MeLoN_ApplicationMaster {
 			if (task.getSessionId() != session.sessionId) {
 				return;
 			}
-			LOG.info("***test {}", gpuAllocator.getGPUDeviceallocInfo().size());
-
-			for (GPURequest gpuReq : gpuAllocator.getGPUDeviceallocInfo()) {
-				LOG.info("***taskId {} ? {}", gpuReq.getContainerId(), containerId);
-				if (gpuReq.isThisContainer(containerId)) {
-					gpuReq.finished();
-				}
-
-			}
+			gpuAllocator.onTaskCompleted(containerId);
 			LOG.info("Container {} for task {}:{} finished with exitStatus: {}.", containerId, task.getJobName(),
 					task.getTaskIndex(), exitStatus);
 			session.onTaskCompleted(task.getJobName(), task.getTaskIndex(), exitStatus);

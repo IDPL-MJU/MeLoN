@@ -18,7 +18,9 @@ public class GPUDeviceInfo {
 	private List<String> allocatedTask;
 	
 	private int computeProcessCount;
+	private int sessionCPC;
 	private int gpuUtil;
+	private int sessionGPUUtil;
 	
 	public GPUDeviceInfo(String deviceHost, int deviceNum, int total, int used, int cpc, int gpuUtil){
 		this.deviceHost = deviceHost;
@@ -31,7 +33,9 @@ public class GPUDeviceInfo {
 		this.nonAllocated = total - this.allocated;
 		this.allocatedTask = new ArrayList<>();
 		this.computeProcessCount = cpc;
+		this.sessionCPC = 0;
 		this.gpuUtil = gpuUtil;
+		this.sessionGPUUtil = 0;
 	}
 	
 	private void computeNonAllocatedMemory() {
@@ -67,16 +71,25 @@ public class GPUDeviceInfo {
 	}
 
 	public int getComputeProcessCount() {
-		return computeProcessCount;
+		return computeProcessCount + sessionCPC;
 	}
 
 	public int getGpuUtil() {
-		return gpuUtil;
+		return gpuUtil + sessionGPUUtil;
 	}
 	
-	public void plusComputeProcessCount() {
-		this.computeProcessCount++;
-		this.gpuUtil++;
+	public float getGPUUtilPerCPC() {
+		return getComputeProcessCount() == 0 ? gpuUtil / 1 : gpuUtil / getComputeProcessCount();
+	}
+	
+	public void increaseComputeProcessCount() {
+		this.sessionCPC++;
+		this.sessionGPUUtil+=100;
+	}
+	
+	public void decreaseComputeProcessCount() {
+		this.sessionCPC--;
+		this.sessionGPUUtil-=100;
 	}
 
 	public void updateGPUInfo(int used, int cptPsCnt, int gpuUtil) {

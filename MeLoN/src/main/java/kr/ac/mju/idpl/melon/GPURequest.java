@@ -104,12 +104,16 @@ public class GPURequest {
 	}
 
 	public void finished() {
-		this.device.deallocateMemory(requiredGPUMemory, requestTask);
-		this.device = null;
+		if(this.device != null) {
+			this.device.decreaseComputeProcessCount();
+			this.device.deallocateMemory(requiredGPUMemory, requestTask);
+			this.device = null;
+		}
 		setStatusFinished();
 	}
 	
 	public void resetRequest() {
+		this.device.decreaseComputeProcessCount();
 		this.device.deallocateMemory((int) (this.requiredGPUMemory * 1.1), this.requestTask);
 		this.device = null;
 		setStatusNotReady();

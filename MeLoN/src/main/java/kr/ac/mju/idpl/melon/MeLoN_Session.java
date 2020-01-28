@@ -128,15 +128,21 @@ public class MeLoN_Session {
 	}
 
 	public synchronized MeLoN_Task getAndInitMatchingTaskByPriority(int priority) {
+		int test = 0;
 		for (Map.Entry<String, MeLoN_ContainerRequest> entry : containerRequests.entrySet()) {
+			test++;
+			LOG.info("***loop = {}.", test);
 			String jobName = entry.getKey();
+			LOG.info("***JOB Name = {}.", jobName);
 			if (entry.getValue().getPriority() != priority) {
 				LOG.debug("Ignoring jobName {" + jobName + "} as priority doesn't match");
 				continue;
 			}
 			MeLoN_Task[] tasks = jobTasks.get(jobName);
 			for (int i = 0; i < tasks.length; i++) {
+				LOG.info("***Index = {}.", i);
 				if (tasks[i] == null) {
+					LOG.info("***Index {} is null.", i);
 					tasks[i] = new MeLoN_Task(jobName, String.valueOf(i), sessionId);
 					return tasks[i];
 				}

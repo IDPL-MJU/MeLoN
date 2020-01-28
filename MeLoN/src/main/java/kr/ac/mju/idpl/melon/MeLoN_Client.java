@@ -28,11 +28,9 @@ import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.math3.analysis.function.Constant;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
@@ -412,11 +410,16 @@ public class MeLoN_Client {
 		}
 		
 		appContext.setAMContainerSpec(amContainer);
-		LOG.info("*********am.resources : " + localResources.toString());
-		LOG.info("*********am.resources : " + localResources);
+		LOG.info("***am.resources : " + localResources);
 
 		LOG.info("Submitting YARN application" + "[" + appId + "]");
 		yarnClient.submitApplication(appContext);
+		File start = new File("/home/hadoop/melon/experiment/result/" + appId + "_0_start");
+		try {
+			start.createNewFile();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 		LOG.info("***melonFinalConf : " + melonConf.getValByRegex("melon\\.([a-z]+)\\.([a-z]+)"));
 		ApplicationReport report = yarnClient.getApplicationReport(appId);
 		//return monitorApplication();

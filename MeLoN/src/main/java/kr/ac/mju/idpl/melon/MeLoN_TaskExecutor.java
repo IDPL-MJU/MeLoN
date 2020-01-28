@@ -111,9 +111,7 @@ public class MeLoN_TaskExecutor {
 		device = shellEnvs.get(MeLoN_Constants.CUDA_VISIBLE_DEVICES);
 		fraction = shellEnvs.get(MeLoN_Constants.FRACTION);
 		
-		LOG.info("***:wq"
-				+ ":wq"
-				+ " = {}", device);
+		LOG.info("***device = {}", device);
 		LOG.info("***FRACTION = {}", fraction);
 		
 		shellEnvs.put(MeLoN_Constants.JOB_NAME, String.valueOf(jobName));
