@@ -26,20 +26,20 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
-import kr.ac.mju.idpl.melon.MeLoN_Constants.GPUAllocMode;
+import kr.ac.mju.idpl.melon.MeLoN_Constants.GPUAllocType;
 
 public class MeLoN_GPUAllocator {
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_GPUAllocator.class);
 	private String[] nodes;
 	private Map<String, GPUDeviceInfo> nodeGPUInfoMap = new HashMap<>();
-	private GPUAllocMode gpuAllocMode;
+	private GPUAllocType gpuAllocType;
 	private List<GPURequest> gpuDeviceAllocInfo = new Vector<>();
 	
 	private boolean allAllocated;
 	
-	MeLoN_GPUAllocator(String[] nodes, GPUAllocMode gpuAllocMode){
+	MeLoN_GPUAllocator(String[] nodes, GPUAllocType gpuAllocType){
 		this.nodes = nodes;
-		this.gpuAllocMode = gpuAllocMode;
+		this.gpuAllocType = gpuAllocType;
 	}
 	private int parseMibStrToMbInt(String memoryUsageStr) {
 		memoryUsageStr = memoryUsageStr.toLowerCase();
@@ -143,7 +143,7 @@ public class MeLoN_GPUAllocator {
 		logGPUInfo();
 		allAllocated = true;
 		LOG.info("=================================");
-		LOG.info("***GPU allocation mode is {}", gpuAllocMode);
+		LOG.info("***GPU allocation mode is {}", gpuAllocType);
 		LOG.info("=================================");
 		for (GPURequest gpuReq : gpuDeviceAllocInfo) {
 			if(gpuReq.isNotReady()) {
@@ -157,7 +157,7 @@ public class MeLoN_GPUAllocator {
 //				int allocDeviceMemoryFree = 0;
 //				int allocDeviceGPUUtil = 100;
 //				int allocDeviceCPC = 100;
-				if (gpuAllocMode == GPUAllocMode.MELON) {
+				if (gpuAllocType == GPUAllocType.OVERPROVISION) {
 					for (String deviceId : nodeGPUInfoMap.keySet()) {
 						if(nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
 							if(nodeGPUInfoMap.get(deviceId).getGpuUtil() < (allocDevice.getGpuUtil() + 5)
@@ -171,32 +171,32 @@ public class MeLoN_GPUAllocator {
 							}
 						}
 					}
-				} else if (gpuAllocMode == GPUAllocMode.WORST) {
-					for (String deviceId : nodeGPUInfoMap.keySet()) {
-						if (nodeGPUInfoMap.get(deviceId).getFree() > allocDevice.getFree()
-								&& nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
-							allocDevice = nodeGPUInfoMap.get(deviceId);
-						}
-					}
-				} else if (gpuAllocMode == GPUAllocMode.BEST) {
-					for (String deviceId : nodeGPUInfoMap.keySet()) {
-//						if (allocDevice.getFree() == 0) {
-//							allocDevice.getFree() = Integer.MAX_VALUE;
+//				} else if (gpuAllocMode == GPUAllocMode.WORST) {
+//					for (String deviceId : nodeGPUInfoMap.keySet()) {
+//						if (nodeGPUInfoMap.get(deviceId).getFree() > allocDevice.getFree()
+//								&& nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
+//							allocDevice = nodeGPUInfoMap.get(deviceId);
 //						}
-						if (nodeGPUInfoMap.get(deviceId).getFree() < allocDevice.getFree()
-								&& nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
-							allocDevice = nodeGPUInfoMap.get(deviceId);
-						}
-					}
-				} else if (gpuAllocMode == GPUAllocMode.WHOLE) {
-					allocDevice = null;
-					for (String deviceId : nodeGPUInfoMap.keySet()) {
-						if (nodeGPUInfoMap.get(deviceId).getComputeProcessCount() == 0
-								&& nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
-							LOG.info("***Device {} is 0 cpc and has enough memory.", deviceId);
-							allocDevice = nodeGPUInfoMap.get(deviceId);
-						}
-					}
+//					}
+//				} else if (gpuAllocMode == GPUAllocMode.BEST) {
+//					for (String deviceId : nodeGPUInfoMap.keySet()) {
+////						if (allocDevice.getFree() == 0) {
+////							allocDevice.getFree() = Integer.MAX_VALUE;
+////						}
+//						if (nodeGPUInfoMap.get(deviceId).getFree() < allocDevice.getFree()
+//								&& nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
+//							allocDevice = nodeGPUInfoMap.get(deviceId);
+//						}
+//					}
+//				} else if (gpuAllocMode == GPUAllocMode.WHOLE) {
+//					allocDevice = null;
+//					for (String deviceId : nodeGPUInfoMap.keySet()) {
+//						if (nodeGPUInfoMap.get(deviceId).getComputeProcessCount() == 0
+//								&& nodeGPUInfoMap.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
+//							LOG.info("***Device {} is 0 cpc and has enough memory.", deviceId);
+//							allocDevice = nodeGPUInfoMap.get(deviceId);
+//						}
+//					}
 				}
 				LOG.info("Task({}) using {}MB Gpu memory.", gpuReq.getRequestTask(), gpuReq.getRequiredGPUMemory());
 				if(allocDevice != null) {

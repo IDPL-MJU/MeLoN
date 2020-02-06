@@ -65,7 +65,7 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 
 import kr.ac.mju.idpl.melon.MeLoN_Constants.AppExecutionType;
-import kr.ac.mju.idpl.melon.MeLoN_Constants.GPUAllocMode;
+import kr.ac.mju.idpl.melon.MeLoN_Constants.GPUAllocType;
 import kr.ac.mju.idpl.melon.rpc.RPCServer;
 import kr.ac.mju.idpl.melon.util.Utils;
 
@@ -73,7 +73,7 @@ public class MeLoN_ApplicationMaster {
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_ApplicationMaster.class);
 
 	private AppExecutionType appExecutionType = null;
-	private GPUAllocMode gpuAllocMode = null;
+	private GPUAllocType gpuAllocType = null;
 
 	private Configuration yarnConf;
 	private Configuration hdfsConf;
@@ -179,7 +179,7 @@ public class MeLoN_ApplicationMaster {
 		appIdString = containerId.getApplicationAttemptId().getApplicationId().toString();
 		hdfsClasspath = cliParser.getOptionValue("hdfs_classpath");
 		appExecutionType = AppExecutionType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.EXECUTION_TYPE));
-		gpuAllocMode = GPUAllocMode.valueOf(melonConf.get(MeLoN_ConfigurationKeys.GPU_ALLOCATION_MODE));
+		gpuAllocType = GPUAllocType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.GPU_ALLOCATION_MODE));
 
 		return true;
 	}
@@ -226,7 +226,7 @@ public class MeLoN_ApplicationMaster {
 		session.setResources(yarnConf, hdfsConf, localResources, containerEnvs, hdfsClasspath);
 		List<MeLoN_ContainerRequest> requests = session.getContainerRequests();
 		LOG.info("Requests : " + requests.toString());
-		gpuAllocator = new MeLoN_GPUAllocator(nodes, gpuAllocMode);
+		gpuAllocator = new MeLoN_GPUAllocator(nodes, gpuAllocType);
 		gpuAllocator.setGPURequests(requests);
 
 		if (appExecutionType == AppExecutionType.TEST_AM) {
@@ -321,7 +321,7 @@ public class MeLoN_ApplicationMaster {
 		appExecutionResult.setApplicationId(appIdString);
 		appExecutionResult.setAppExecutionTime(appExecutionTime);
 		appExecutionResult.setAppExecutionType(appExecutionType.name());
-		appExecutionResult.setGpuAllocMode(gpuAllocMode.name());
+		appExecutionResult.setGpuAllocMode(gpuAllocType.name());
 		executorExecutionResults = rpcServer.getExecutorExecutionResults();
 		LOG.info("===============Application Summary===============");
 		LOG.info("Application ID : {}", appExecutionResult.getApplicationId());

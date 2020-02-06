@@ -63,8 +63,10 @@ import kr.ac.mju.idpl.melon.MeLoN_Client;
 public class MeLoN_Client {
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_Client.class);
 
+	// Execution Configurations
 	private AppExecutionType appExecutionType = null;
-	private GPUAllocMode gpuAllocMode = null;
+	private GPUAllocType gpuAllocType = null;
+
 	// Configurations
 	private YarnClient yarnClient;
 	private YarnConfiguration yarnConf;
@@ -95,10 +97,9 @@ public class MeLoN_Client {
 	private FileSystem fs;
 
 	private final String melonAMClass = MeLoN_ApplicationMaster.class.getName();
-	// private int amPriority;
-	private String amQueue = "";
-
-	private String appUri;
+//	private int appPriority;
+	private String appQueue = "";
+//	private String appUri;
 
 	public MeLoN_Client() {
 		initOptions();
@@ -107,86 +108,7 @@ public class MeLoN_Client {
 		melonConf = new Configuration(false);
 		yarnClient = YarnClient.createYarnClient();
 		appExecutionType = AppExecutionType.DISTRIBUTED;
-		gpuAllocMode = GPUAllocMode.WORST;
-	}
-
-	private void initHdfsConf() {
-		LOG.info("Initializing HDFS configurations...");
-		if (System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) != null) {
-			hdfsConf.addResource(new Path(System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) + File.separatorChar
-					+ MeLoN_Constants.CORE_SITE_CONF));
-			hdfsConf.addResource(new Path(System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) + File.separatorChar
-					+ MeLoN_Constants.HDFS_SITE_CONF));
-		}
-		if (hdfsConfAddress != null) {
-			hdfsConf.addResource(new Path(hdfsConfAddress));
-		}
-		LOG.info("Finished initializing HDFS configurations...");
-	}
-
-	private void initYarnConf() {
-		LOG.info("Initializing YARN configurations...");
-		if (System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) != null) {
-			yarnConf.addResource(new Path(System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) + File.separatorChar
-					+ MeLoN_Constants.CORE_SITE_CONF));
-			yarnConf.addResource(new Path(System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) + File.separatorChar
-					+ MeLoN_Constants.YARN_SITE_CONF));
-		}
-		if (yarnConfAddress != null) {
-			yarnConf.addResource(new Path(this.yarnConfAddress));
-		}
-		LOG.info("Finished initializing YARN configurations...");
-	}
-
-	private void initOptions() {
-		opts = new Options();
-		// opts.addOption("appName", true, "Application Name. Default value - melon");
-		// opts.addOption("priority", true, "Application Priority. Default value - 0");
-		// opts.addOption("hdfs_classpath", true, "Path to jars on HDFS for workers.");
-		opts.addOption("python_venv", true, "The python virtual environment zip. Default : venv.zip");
-		opts.addOption("python_bin_path", true, "The relative path to python binary. Default : Python/bin/python");
-		opts.addOption("executes", true, "The file to execute on containers.");
-		opts.addOption("task_params", true, "The task params to pass into python entry point.");
-		opts.addOption("shell_env", true, "Environment for shell script, specified as env_key=env_val pairs");
-		opts.addOption("conf", true, "User specified configuration, as key=val pairs");
-		opts.addOption("conf_file", true, "Name of user specified conf file, on the classpath. Default : melon.xml");
-		opts.addOption("src_dir", true, "Name of directory of source files. Default : src");
-		opts.addOption("jar", true, "JAR file containing the application master. Default : melon.jar");
-		opts.addOption("test_shell", true, "The distributed shell commnad for all container.");
-		opts.addOption("app_execution_type", true, "Batch - BATCH, Distributed - DISTRIBUTED, Test - TEST_CLIENT/TEST_AM/TEST_SHELL. Default : DISTRIBUTED");
-		opts.addOption("gpu_alloc_mode", true, "(WORST, BEST)");
-		opts.addOption("help", false, "Print usage.");
-	}
-
-	private void initMelonConf(CommandLine cliParser) throws IOException {
-		LOG.info("Starting init melon configurations");
-		LOG.info("Initializing from a default configuration file. 'melon-default.xml'");
-		this.melonConf.addResource(new Path("melon-default.xml"));
-		if (cliParser.hasOption("conf_file")) {
-			// assume local file only
-			Path confFilePath = new Path(cliParser.getOptionValue("conf_file"));
-			LOG.info("Adding " + confFilePath + " to melon configurations.");
-			melonConf.addResource(confFilePath);
-		} else {
-			LOG.info("Adding " + "melon.xml" + " to melon configurations.");
-			melonConf.addResource(new Path("melon.xml"));
-		}
-
-		if (cliParser.hasOption("conf")) {
-			LOG.info("Adding a 'conf' option value(KeyValuePair) to melon configurations.");
-			String[] cliConfs = cliParser.getOptionValues("conf");
-			for (Map.Entry<String, String> cliConf : Utils.parseKeyValue(cliConfs).entrySet()) {
-				String[] alreadySetConf = melonConf.getStrings(cliConf.getKey());
-				if (alreadySetConf != null && MeLoN_ConfigurationKeys.MULTI_VALUE_CONF.contains(cliConf.getKey())) {
-					ArrayList<String> newValues = new ArrayList<>(Arrays.asList(alreadySetConf));
-					newValues.add(cliConf.getValue());
-					melonConf.setStrings(cliConf.getKey(), newValues.toArray(new String[0]));
-				} else {
-					melonConf.set(cliConf.getKey(), cliConf.getValue());
-				}
-			}
-		}
-		LOG.info("Finished initializing melon configurations");
+		gpuAllocType = GPUAllocType.EXCLUSIVE;
 	}
 
 	public boolean init(String[] args) throws ParseException, IOException {
@@ -196,17 +118,20 @@ public class MeLoN_Client {
 			printUsage();
 			return false;
 		}
-		initMelonConf(cliParser);
 
 		hdfsConfAddress = melonConf.get(MeLoN_ConfigurationKeys.HDFS_CONF_PATH);
 		yarnConfAddress = melonConf.get(MeLoN_ConfigurationKeys.YARN_CONF_PATH);
+		
+		// init configurations
+		initMelonConf(cliParser);	
 		initHdfsConf();
 		initYarnConf();
+		
+		// init YARN Client
 		yarnClient.init(yarnConf);
 
-		String amMemoryString = melonConf.get(MeLoN_ConfigurationKeys.AM_MEMORY,
-				MeLoN_ConfigurationKeys.AM_MEMORY_DEFAULT);
-		amMemory = Integer.parseInt(Utils.parseMemoryString(amMemoryString));
+		amMemory = Integer.parseInt(Utils.parseMemoryString(melonConf.get(MeLoN_ConfigurationKeys.AM_MEMORY,
+				MeLoN_ConfigurationKeys.AM_MEMORY_DEFAULT)));
 		amVCores = melonConf.getInt(MeLoN_ConfigurationKeys.AM_VCORES, MeLoN_ConfigurationKeys.AM_VCORES_DEFAULT);
 		amGpus = melonConf.getInt(MeLoN_ConfigurationKeys.AM_GPUS, MeLoN_ConfigurationKeys.AM_GPUS_DEFAULT);
 		pythonBinaryPath = cliParser.getOptionValue("python_bin_path", "bin/python");
@@ -227,9 +152,9 @@ public class MeLoN_Client {
 		melonConf.set(MeLoN_ConfigurationKeys.EXECUTION_TYPE, appExecutionType.name());
 		
 		if (cliParser.hasOption("gpu_alloc_mode")) {
-			gpuAllocMode = GPUAllocMode.valueOf(cliParser.getOptionValue("gpu_alloc_mode"));
+			gpuAllocType = GPUAllocType.valueOf(cliParser.getOptionValue("gpu_alloc_mode"));
 		}
-		melonConf.set(MeLoN_ConfigurationKeys.GPU_ALLOCATION_MODE, gpuAllocMode.name());
+		melonConf.set(MeLoN_ConfigurationKeys.GPU_ALLOCATION_MODE, gpuAllocType.name());
 
 		melonConf.set(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND, executes);
 
@@ -285,6 +210,85 @@ public class MeLoN_Client {
 		return true;
 	}
 
+	private void initMelonConf(CommandLine cliParser) throws IOException {
+		LOG.info("Starting init melon configurations");
+		LOG.info("Initializing from a default configuration file. 'melon-default.xml'");
+		this.melonConf.addResource(new Path("melon-default.xml"));
+		if (cliParser.hasOption("conf_file")) {
+			// assume local file only
+			Path confFilePath = new Path(cliParser.getOptionValue("conf_file"));
+			LOG.info("Adding " + confFilePath + " to melon configurations.");
+			melonConf.addResource(confFilePath);
+		} else {
+			LOG.info("Adding " + "melon.xml" + " to melon configurations.");
+			melonConf.addResource(new Path("melon.xml"));
+		}
+
+		if (cliParser.hasOption("conf")) {
+			LOG.info("Adding a 'conf' option value(KeyValuePair) to melon configurations.");
+			String[] cliConfs = cliParser.getOptionValues("conf");
+			for (Map.Entry<String, String> cliConf : Utils.parseKeyValue(cliConfs).entrySet()) {
+				String[] alreadySetConf = melonConf.getStrings(cliConf.getKey());
+				if (alreadySetConf != null && MeLoN_ConfigurationKeys.MULTI_VALUE_CONF.contains(cliConf.getKey())) {
+					ArrayList<String> newValues = new ArrayList<>(Arrays.asList(alreadySetConf));
+					newValues.add(cliConf.getValue());
+					melonConf.setStrings(cliConf.getKey(), newValues.toArray(new String[0]));
+				} else {
+					melonConf.set(cliConf.getKey(), cliConf.getValue());
+				}
+			}
+		}
+		LOG.info("Finished initializing melon configurations");
+	}
+
+	private void initHdfsConf() {
+		LOG.info("Initializing HDFS configurations...");
+		if (System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) != null) {
+			hdfsConf.addResource(new Path(System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) + File.separatorChar
+					+ MeLoN_Constants.CORE_SITE_CONF));
+			hdfsConf.addResource(new Path(System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) + File.separatorChar
+					+ MeLoN_Constants.HDFS_SITE_CONF));
+		}
+		if (hdfsConfAddress != null) {
+			hdfsConf.addResource(new Path(hdfsConfAddress));
+		}
+		LOG.info("Finished initializing HDFS configurations...");
+	}
+
+	private void initYarnConf() {
+		LOG.info("Initializing YARN configurations...");
+		if (System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) != null) {
+			yarnConf.addResource(new Path(System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) + File.separatorChar
+					+ MeLoN_Constants.CORE_SITE_CONF));
+			yarnConf.addResource(new Path(System.getenv(MeLoN_Constants.HADOOP_CONF_DIR) + File.separatorChar
+					+ MeLoN_Constants.YARN_SITE_CONF));
+		}
+		if (yarnConfAddress != null) {
+			yarnConf.addResource(new Path(this.yarnConfAddress));
+		}
+		LOG.info("Finished initializing YARN configurations...");
+	}
+
+	private void initOptions() {
+		opts = new Options();
+		opts.addOption("appName", true, "Application Name. Default value - melon");
+		// opts.addOption("priority", true, "Application Priority. Default value - 0");
+		// opts.addOption("hdfs_classpath", true, "Path to jars on HDFS for workers.");
+		opts.addOption("python_venv", true, "The python virtual environment zip. Default : venv.zip");
+		opts.addOption("python_bin_path", true, "The relative path to python binary. Default : Python/bin/python");
+		opts.addOption("executes", true, "The file to execute on containers.");
+		opts.addOption("task_params", true, "The task params to pass into python entry point.");
+		opts.addOption("shell_env", true, "Environment for shell script, specified as env_key=env_val pairs");
+		opts.addOption("conf", true, "User specified configuration, as key=val pairs");
+		opts.addOption("conf_file", true, "Name of user specified conf file, on the classpath. Default : melon.xml");
+		opts.addOption("src_dir", true, "Name of directory of source files. Default : src");
+		opts.addOption("jar", true, "JAR file containing the application master. Default : melon.jar");
+		opts.addOption("test_shell", true, "The distributed shell commnad for all container.");
+		opts.addOption("app_execution_type", true, "Batch - BATCH, Distributed - DISTRIBUTED, Test - TEST_CLIENT/TEST_AM/TEST_SHELL. Default : DISTRIBUTED");
+		opts.addOption("gpu_alloc_mode", true, "(WORST, BEST)");
+		opts.addOption("help", false, "Print usage.");
+	}
+	
 	public String buildTaskCommand(String pythonVenv, String pythonBinaryPath, String executes, String taskParams) {
 		LOG.info("Building a container task command.");
 		if (executes != null) {
@@ -375,9 +379,9 @@ public class MeLoN_Client {
 		appContext.setApplicationName(appName);
 		appId = appContext.getApplicationId();
 
-		amQueue = melonConf.get(MeLoN_ConfigurationKeys.YARN_QUEUE_NAME,
+		appQueue = melonConf.get(MeLoN_ConfigurationKeys.YARN_QUEUE_NAME,
 				MeLoN_ConfigurationKeys.YARN_QUEUE_NAME_DEFAULT);
-		appContext.setQueue(amQueue);
+		appContext.setQueue(appQueue);
 
 		appResourcesPath = new Path(fs.getHomeDirectory(), appName + File.separator + appId.toString());
 
@@ -387,7 +391,7 @@ public class MeLoN_Client {
 		Utils.setCapabilityGPU(capability, amGpus);
 		appContext.setResource(capability);
 
-		appContext.setQueue(amQueue);
+		appContext.setQueue(appQueue);
 
 		ContainerLaunchContext amContainer = Records.newRecord(ContainerLaunchContext.class);
 		Map<String, LocalResource> localResources = new HashMap<>();
