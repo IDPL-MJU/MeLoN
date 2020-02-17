@@ -148,17 +148,14 @@ public class MeLoN_TaskExecutor {
 
 	private int executeShell() throws IOException, InterruptedException {
 		LOG.info("Executing command: " + taskCommand);
-		if (appExecutionType != AppExecutionType.TEST_SHELL) {
-			String executablePath = taskCommand.trim().split(" ")[0];
-			File executable = new File(executablePath);
-			if (!executable.canExecute()) {
-				if (!executable.setExecutable(true)) {
-					LOG.warn("Failed to make " + executable + " executable");
-				}
+		String executablePath = taskCommand.trim().split(" ")[0];
+		File executable = new File(executablePath);
+		if (!executable.canExecute()) {
+			if (!executable.setExecutable(true)) {
+				LOG.warn("Failed to make " + executable + " executable");
 			}
 		}
 
-		//taskCommand = "unzip -o venv.zip -d ./venv;" + taskCommand;
 		//taskCommand += "; rm -r ./*";
 		LOG.info("Executing command: " + taskCommand);
 		ProcessBuilder taskProcessBuilder = new ProcessBuilder("bash", "-c", taskCommand);

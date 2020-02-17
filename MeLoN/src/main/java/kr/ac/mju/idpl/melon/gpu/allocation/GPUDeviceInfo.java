@@ -1,4 +1,4 @@
-package kr.ac.mju.idpl.melon;
+package kr.ac.mju.idpl.melon.gpu.allocation;
 
 import java.util.ArrayList;
 import java.util.List;

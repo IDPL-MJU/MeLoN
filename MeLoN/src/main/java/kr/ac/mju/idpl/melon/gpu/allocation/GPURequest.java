@@ -1,4 +1,4 @@
-package kr.ac.mju.idpl.melon;
+package kr.ac.mju.idpl.melon.gpu.allocation;
 
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
@@ -10,8 +10,8 @@ public class GPURequest {
 	private int requiredGPUMemory;
 	private Status requestStatus;
 	private enum Status {
-		NOT_READY,
-		READY,
+		DEFAULT,
+		ASSIGNED,
 		REQUESTED,
 		ALLOCATED,
 		FINISHED
@@ -21,7 +21,7 @@ public class GPURequest {
 		this.device = null;
 		this.requestTask = requestTask;
 		this.requiredGPUMemory = requiredGPUMemory;
-		setStatusNotReady();
+		setStatusDefault();
 	}
 	
 	public GPUDeviceInfo getDevice() {
@@ -51,12 +51,12 @@ public class GPURequest {
 	public void setContainerId(ContainerId containerId) {
 		this.containerId = containerId;
 	}
-	public void setStatusReady() {
-		this.requestStatus = Status.READY;
+	public void setStatusAssigned() {
+		this.requestStatus = Status.ASSIGNED;
 	}
 	
-	public void setStatusNotReady() {
-		this.requestStatus = Status.NOT_READY;
+	public void setStatusDefault() {
+		this.requestStatus = Status.DEFAULT;
 	}
 	
 	public void setStatusRequested() {
@@ -71,12 +71,12 @@ public class GPURequest {
 		this.requestStatus = Status.FINISHED;
 	}
 	
-	public boolean isReady() {
-		return this.requestStatus == Status.READY;
+	public boolean isAssigned() {
+		return this.requestStatus == Status.ASSIGNED;
 	}
 	
-	public boolean isNotReady() {
-		return this.requestStatus == Status.NOT_READY;
+	public boolean isDefault() {
+		return this.requestStatus == Status.DEFAULT;
 	}
 	
 	public boolean isRequested() {
@@ -100,7 +100,7 @@ public class GPURequest {
 	}
 	public void deviceAlloc(GPUDeviceInfo device) {
 		this.device = device;
-		setStatusReady();
+		setStatusAssigned();
 	}
 
 	public void finished() {
@@ -116,6 +116,6 @@ public class GPURequest {
 		this.device.decreaseComputeProcessCount();
 		this.device.deallocateMemory((int) (this.requiredGPUMemory * 1.1), this.requestTask);
 		this.device = null;
-		setStatusNotReady();
+		setStatusDefault();
 	}
 }

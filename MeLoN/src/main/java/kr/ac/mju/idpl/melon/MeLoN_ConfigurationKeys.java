@@ -25,7 +25,9 @@ public class MeLoN_ConfigurationKeys {
 	public static final String HDFS_CONF_PATH = MELON_PREFIX + APPLICATION_PREFIX + "hdfs-conf-path";
 	public static final String YARN_CONF_PATH = MELON_PREFIX + APPLICATION_PREFIX + "yarn-conf-path";
 	public static final String EXECUTION_TYPE = MELON_PREFIX + APPLICATION_PREFIX + "execution-type";
-	public static final String GPU_ALLOCATION_MODE = MELON_PREFIX + APPLICATION_PREFIX + "gpu-alloc";
+	public static final String EXECUTION_TYPE_DEFAULT = "batch";
+	public static final String GPU_ALLOCATION_TYPE = MELON_PREFIX + APPLICATION_PREFIX + "gpu-alloc";
+	public static final String GPU_ALLOCATION_TYPE_DEFAULT = "exclusive";
 
 	public static final String PYTHON_VENV = APPLICATION_PREFIX + "python-venv";
 	public static final String PYTHON_BIN_PATH = APPLICATION_PREFIX + "python-bin-path";
@@ -44,7 +46,10 @@ public class MeLoN_ConfigurationKeys {
 	public static final String CONTAINERS_COMMAND = MELON_PREFIX + "containers.command";
 
 	public static final String INSTANCES_REGEX = "melon\\.([a-z]+)\\.instances";
-	public static final String GPUMEMORY_REGEX = "melon\\.([a-z]+)\\.gpu-memory-mb";
+//	public static final String MEMORY_REGEX = "melon\\.([a-z]+)\\.memory";
+//	public static final String VCORES_REGEX = "melon\\.([a-z]+)\\.vcores";
+//	public static final String GPUS_REGEX = "melon\\.([a-z]+)\\.gpus";
+//	public static final String GPUMEMORY_REGEX = "melon\\.([a-z]+)\\.gpu-memory-mb";
 	public static final String RESOURCES_REGEX = "melon\\.([a-z]+)\\.resources";
 	// Configurations that can take multiple values.
 	public static final List<String> MULTI_VALUE_CONF = Collections
