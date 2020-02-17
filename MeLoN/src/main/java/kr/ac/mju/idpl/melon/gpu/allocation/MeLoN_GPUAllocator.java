@@ -31,6 +31,7 @@ import kr.ac.mju.idpl.melon.MeLoN_ContainerRequest;
 import kr.ac.mju.idpl.melon.MeLoN_Task;
 import kr.ac.mju.idpl.melon.MeLoN_Constants.AppExecutionType;
 import kr.ac.mju.idpl.melon.gpu.allocation.*;
+import kr.ac.mju.idpl.melon.gpu.allocation.strategy.GPUAllocationStrategy;
 
 public class MeLoN_GPUAllocator {
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_GPUAllocator.class);
