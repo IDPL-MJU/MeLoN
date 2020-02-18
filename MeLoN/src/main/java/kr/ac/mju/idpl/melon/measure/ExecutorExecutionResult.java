@@ -1,4 +1,4 @@
-package kr.ac.mju.idpl.melon;
+package kr.ac.mju.idpl.melon.measure;
 
 import org.apache.hadoop.yarn.api.records.ContainerId;
 

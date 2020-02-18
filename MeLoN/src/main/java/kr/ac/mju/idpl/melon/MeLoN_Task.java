@@ -14,6 +14,14 @@ public class MeLoN_Task {
 	private TaskStatus status;
 	private boolean completed = false;
 	private int exitStatus = -1;
+	public enum TaskStatus{
+		NEW,
+		READY,
+		RUNNING,
+		FAILED,
+		SUCCEEDED,
+		FINISHED
+	}
 
 	public boolean isCompleted() {
 		return completed;

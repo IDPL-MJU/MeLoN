@@ -17,10 +17,9 @@ import org.slf4j.LoggerFactory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import kr.ac.mju.idpl.melon.ExecutorExecutionResult;
-
 import kr.ac.mju.idpl.melon.MeLoN_Session;
 import kr.ac.mju.idpl.melon.MeLoN_Task;
+import kr.ac.mju.idpl.melon.measure.ExecutorExecutionResult;
 
 
 public class RPCServer extends Thread implements RPCProtocol {
@@ -65,8 +64,12 @@ public class RPCServer extends Thread implements RPCProtocol {
 		LOG.info("Running RPCServer ...");
 		try {
 			LOG.info("Building RPCServer ...");
-			server = new RPC.Builder(yarnConf).setProtocol(RPCProtocol.class).setInstance(this)
-					.setBindAddress(rpcAddress).setPort(rpcPort).build();
+			server = new RPC.Builder(yarnConf)
+					.setProtocol(RPCProtocol.class)
+					.setInstance(this)
+					.setBindAddress(rpcAddress)
+					.setPort(rpcPort)
+					.build();
 			LOG.info("Starting RPCServer ...");
 			server.start();
 		} catch (Exception e) {

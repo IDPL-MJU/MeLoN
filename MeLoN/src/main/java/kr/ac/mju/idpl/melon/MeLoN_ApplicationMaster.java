@@ -66,8 +66,11 @@ import org.xml.sax.SAXException;
 
 import kr.ac.mju.idpl.melon.MeLoN_Constants.AppExecutionType;
 import kr.ac.mju.idpl.melon.MeLoN_Constants.GPUAllocType;
+import kr.ac.mju.idpl.melon.MeLoN_Task.TaskStatus;
 import kr.ac.mju.idpl.melon.gpu.allocation.*;
 import kr.ac.mju.idpl.melon.gpu.allocation.strategy.*;
+import kr.ac.mju.idpl.melon.measure.AppExecutionResult;
+import kr.ac.mju.idpl.melon.measure.ExecutorExecutionResult;
 import kr.ac.mju.idpl.melon.rpc.RPCServer;
 import kr.ac.mju.idpl.melon.util.Utils;
 
