@@ -19,7 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import kr.ac.mju.idpl.melon.MeLoN_Session;
 import kr.ac.mju.idpl.melon.MeLoN_Task;
-import kr.ac.mju.idpl.melon.measure.ExecutorExecutionResult;
+import kr.ac.mju.idpl.melon.measurement.ExecutorExecutionResult;
 
 
 public class RPCServer extends Thread implements RPCProtocol {

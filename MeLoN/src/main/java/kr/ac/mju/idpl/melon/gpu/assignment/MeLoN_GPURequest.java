@@ -1,35 +1,35 @@
-package kr.ac.mju.idpl.melon.gpu.allocation;
+package kr.ac.mju.idpl.melon.gpu.assignment;
 
 import org.apache.hadoop.yarn.api.records.Container;
 import org.apache.hadoop.yarn.api.records.ContainerId;
 
-public class GPURequest {
-	private GPUDeviceInfo device;
-	private String requestTask;
+public class MeLoN_GPURequest {
+	private MeLoN_GPUDeviceInfo device;
+	private String jobName;
 	private ContainerId containerId;
 	private int requiredGPUMemory;
 	private Status requestStatus;
 	private enum Status {
-		DEFAULT,
+		STANDBY,
 		ASSIGNED,
 		REQUESTED,
 		ALLOCATED,
 		FINISHED
 	}
 	
-	public GPURequest(String requestTask, int requiredGPUMemory) {
+	public MeLoN_GPURequest(String jobName, int requiredGPUMemory) {
 		this.device = null;
-		this.requestTask = requestTask;
+		this.jobName = jobName;
 		this.requiredGPUMemory = requiredGPUMemory;
-		setStatusDefault();
+		setStatusStandby();
 	}
 	
-	public GPUDeviceInfo getDevice() {
+	public MeLoN_GPUDeviceInfo getDevice() {
 		return device;
 	}
 
-	public String getRequestTask() {
-		return requestTask;
+	public String getJobName() {
+		return jobName;
 	}
 	
 	public ContainerId getContainerId() {
@@ -51,12 +51,13 @@ public class GPURequest {
 	public void setContainerId(ContainerId containerId) {
 		this.containerId = containerId;
 	}
+	
 	public void setStatusAssigned() {
 		this.requestStatus = Status.ASSIGNED;
 	}
 	
-	public void setStatusDefault() {
-		this.requestStatus = Status.DEFAULT;
+	public void setStatusStandby() {
+		this.requestStatus = Status.STANDBY;
 	}
 	
 	public void setStatusRequested() {
@@ -75,8 +76,8 @@ public class GPURequest {
 		return this.requestStatus == Status.ASSIGNED;
 	}
 	
-	public boolean isDefault() {
-		return this.requestStatus == Status.DEFAULT;
+	public boolean isStandby() {
+		return this.requestStatus == Status.STANDBY;
 	}
 	
 	public boolean isRequested() {
@@ -98,7 +99,7 @@ public class GPURequest {
 	public boolean isThisContainer(ContainerId containerId) {
 		return this.containerId.equals(containerId);
 	}
-	public void deviceAlloc(GPUDeviceInfo device) {
+	public void deviceAssign(MeLoN_GPUDeviceInfo device) {
 		this.device = device;
 		setStatusAssigned();
 	}
@@ -106,7 +107,7 @@ public class GPURequest {
 	public void finished() {
 		if(this.device != null) {
 			this.device.decreaseComputeProcessCount();
-			this.device.deallocateMemory(requiredGPUMemory, requestTask);
+			this.device.deallocateMemory(requiredGPUMemory, jobName);
 			this.device = null;
 		}
 		setStatusFinished();
@@ -114,8 +115,8 @@ public class GPURequest {
 	
 	public void resetRequest() {
 		this.device.decreaseComputeProcessCount();
-		this.device.deallocateMemory((int) (this.requiredGPUMemory * 1.1), this.requestTask);
+		this.device.deallocateMemory((int) (this.requiredGPUMemory * 1.1), this.jobName);
 		this.device = null;
-		setStatusDefault();
+		setStatusStandby();
 	}
 }

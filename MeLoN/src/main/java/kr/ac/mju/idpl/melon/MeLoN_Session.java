@@ -33,8 +33,8 @@ public class MeLoN_Session {
 	private String jvmArgs;
 	private Configuration melonConf;
 	private Map<String, MeLoN_ContainerRequest> containerRequests;
-	private FinalApplicationStatus trainingFinalStatus = FinalApplicationStatus.UNDEFINED;
 	private Map<String, MeLoN_Task[]> jobTasks = new ConcurrentHashMap<>();
+	private FinalApplicationStatus trainingFinalStatus = FinalApplicationStatus.UNDEFINED;
 	private Map<ContainerId, MeLoN_Task> containerIdMap = new HashMap<>();
 	private boolean trainingFinished = false;
 
@@ -65,28 +65,27 @@ public class MeLoN_Session {
 	}
 
 	public void setResources(Configuration yarnConf, Configuration hdfsConf, Map<String, LocalResource> localResources,
-			Map<String, String> shellEnv, String hdfsClasspathDir) {
+			Map<String, String> containerEnvs, String hdfsClasspathDir) {
 
-		LOG.info("Calling setResources");
 		Map<String, String> env = System.getenv();
+		
+		// put melon configuration file to localResources
 		String melonConfPath = env.get(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.PATH_SUFFIX);
-		LOG.info("melonConfPath : " + melonConfPath);
 		long melonConfTimestamp = Long
 				.parseLong(env.get(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.TIMESTAMP_SUFFIX));
 		long melonConfLength = Long
 				.parseLong(env.get(MeLoN_Constants.MELON_CONF_PREFIX + MeLoN_Constants.LENGTH_SUFFIX));
-
 		LocalResource melonConfResource = LocalResource.newInstance(
 				ConverterUtils.getYarnUrlFromURI(URI.create(melonConfPath)), LocalResourceType.FILE,
 				LocalResourceVisibility.PRIVATE, melonConfLength, melonConfTimestamp);
 		localResources.put(MeLoN_Constants.MELON_FINAL_XML, melonConfResource);
 
+		// put melon jar file to localResources
 		String melonJarPath = env.get(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.PATH_SUFFIX);
 		LOG.info("melonJarPath : " + melonJarPath);
 		long melonJarTimestamp = Long
 				.parseLong(env.get(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.TIMESTAMP_SUFFIX));
 		long melonJarLength = Long.parseLong(env.get(MeLoN_Constants.MELON_JAR_PREFIX + MeLoN_Constants.LENGTH_SUFFIX));
-
 		LocalResource melonJarResource = LocalResource.newInstance(
 				ConverterUtils.getYarnUrlFromURI(URI.create(melonJarPath)), LocalResourceType.FILE,
 				LocalResourceVisibility.PRIVATE, melonJarLength, melonJarTimestamp);
@@ -102,6 +101,7 @@ public class MeLoN_Session {
 			throw new RuntimeException(e);
 		}
 
+		// put classPathEnv to containerEnvs
 		StringBuilder classPathEnv = new StringBuilder(ApplicationConstants.Environment.CLASSPATH.$$())
 				.append(ApplicationConstants.CLASS_PATH_SEPARATOR).append("./*");
 		for (String c : yarnConf.getStrings(YarnConfiguration.YARN_APPLICATION_CLASSPATH,
@@ -109,7 +109,7 @@ public class MeLoN_Session {
 			classPathEnv.append(ApplicationConstants.CLASS_PATH_SEPARATOR);
 			classPathEnv.append(c.trim());
 		}
-		shellEnv.put("CLASSPATH", classPathEnv.toString());
+		containerEnvs.put("CLASSPATH", classPathEnv.toString());
 	}
 
 	public List<MeLoN_ContainerRequest> getContainerRequests() {

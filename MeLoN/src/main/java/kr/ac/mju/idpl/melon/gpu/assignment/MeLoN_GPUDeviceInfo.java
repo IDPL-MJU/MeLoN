@@ -1,9 +1,9 @@
-package kr.ac.mju.idpl.melon.gpu.allocation;
+package kr.ac.mju.idpl.melon.gpu.assignment;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class GPUDeviceInfo {
+public class MeLoN_GPUDeviceInfo {
 	private String deviceHost;
 	private int deviceNum;
 	private String deviceId;	
@@ -22,7 +22,7 @@ public class GPUDeviceInfo {
 	private int gpuUtil;
 	private int sessionGPUUtil;
 	
-	public GPUDeviceInfo(String deviceHost, int deviceNum, int total, int used, int cpc, int gpuUtil){
+	public MeLoN_GPUDeviceInfo(String deviceHost, int deviceNum, int total, int used, int cpc, int gpuUtil){
 		this.deviceHost = deviceHost;
 		this.deviceNum = deviceNum;
 		this.deviceId = deviceHost + ":" + deviceNum;

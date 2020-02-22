@@ -1,4 +1,4 @@
-package kr.ac.mju.idpl.melon.gpu.allocation;
+package kr.ac.mju.idpl.melon.gpu.assignment;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -30,25 +30,28 @@ import kr.ac.mju.idpl.melon.MeLoN_Constants;
 import kr.ac.mju.idpl.melon.MeLoN_ContainerRequest;
 import kr.ac.mju.idpl.melon.MeLoN_Task;
 import kr.ac.mju.idpl.melon.MeLoN_Constants.AppExecutionType;
-import kr.ac.mju.idpl.melon.gpu.allocation.*;
-import kr.ac.mju.idpl.melon.gpu.allocation.strategy.GPUAllocationStrategy;
+import kr.ac.mju.idpl.melon.gpu.assignment.*;
+import kr.ac.mju.idpl.melon.gpu.assignment.strategy.GPUAssignmentStrategy;
 
-public class MeLoN_GPUAllocator {
-	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_GPUAllocator.class);
+public class MeLoN_GPUAssignor {
+	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_GPUAssignor.class);
+	private Map<String, MeLoN_GPUDeviceInfo> gpuDevicesInfo;
+	private List<MeLoN_GPURequest> gpuRequests;
 	private String[] nodes;
-	private Map<String, GPUDeviceInfo> gpuDevicesInfo = new HashMap<>();
-	private GPUAllocationStrategy strategy;
+	private GPUAssignmentStrategy strategy;
 	private AppExecutionType appExecutionType;
-	private List<GPURequest> gpuDeviceAllocInfo = new Vector<>();
 	
-	private boolean allAllocated;
+	private boolean allAssigned;
 	
-	public MeLoN_GPUAllocator(String[] nodes, GPUAllocationStrategy strategy, List<MeLoN_ContainerRequest> requests, AppExecutionType appExecutionType){
+	public MeLoN_GPUAssignor(String[] nodes, GPUAssignmentStrategy strategy, List<MeLoN_ContainerRequest> requests, AppExecutionType appExecutionType){
+		this.gpuDevicesInfo = new HashMap<>();
+		this.gpuRequests = new Vector<>();
 		this.nodes = nodes;
 		this.strategy = strategy;
 		this.appExecutionType = appExecutionType;
-		strategy.initGpuDevAllocInfo(gpuDeviceAllocInfo, requests);
+		strategy.initGpuRequests(gpuRequests, requests);
 	}
+	
 	private int parseMibStrToMbInt(String memoryUsageStr) {
 		memoryUsageStr = memoryUsageStr.toLowerCase();
 		int mib = memoryUsageStr.indexOf("mib");
@@ -61,8 +64,6 @@ public class MeLoN_GPUAllocator {
 	public void updateGPUDeviceInfo() throws IOException, InterruptedException, SAXException,
 			ParserConfigurationException, NumberFormatException, XPathExpressionException {
 		for (String host : nodes) {
-			// LOG.info("=================================");
-			// LOG.info("Host = {}", host);
 			ProcessBuilder monitoringProcessBuilder = new ProcessBuilder("sh", "-c",
 					"sshpass -p hadoop ssh -T -oStrictHostKeyChecking=no hadoop@" + host + " nvidia-smi -q -x");
 			Process monitoringProcess = monitoringProcessBuilder.start();
@@ -113,7 +114,7 @@ public class MeLoN_GPUAllocator {
 				String deviceId = host + ":" + deviceNum;
 				if (!gpuDevicesInfo.containsKey(deviceId)) {
 					gpuDevicesInfo.put(deviceId,
-							new GPUDeviceInfo(host, deviceNum, totalMemoryUsage, usedMemoryUsage, cptPsCnt, gpuUtil));
+							new MeLoN_GPUDeviceInfo(host, deviceNum, totalMemoryUsage, usedMemoryUsage, cptPsCnt, gpuUtil));
 				} else {
 					gpuDevicesInfo.get(deviceId).updateGPUInfo(usedMemoryUsage, cptPsCnt, gpuUtil);
 				}
@@ -131,104 +132,65 @@ public class MeLoN_GPUAllocator {
 		LOG.info("=================================");
 	}
 	
-	public void gpuDeviceAllocating() {
-		while (!isAllAllocated()) {
-			LOG.info("GPU allocation type is {}", strategy.getStrategyName());
-			try {
-				updateGPUDeviceInfo();
-			} catch (NumberFormatException | XPathExpressionException | SAXException
-					| ParserConfigurationException | IOException | InterruptedException e) {
-				e.printStackTrace();
-			}
-			printGPUsInfo();
-			allAllocated = true;
-			for (GPURequest gpuReq : gpuDeviceAllocInfo) {
-				if(gpuReq.isDefault()) {
-					GPUDeviceInfo allocDevice = null;
-					for (String deviceId : gpuDevicesInfo.keySet()) {
-						allocDevice = gpuDevicesInfo.get(deviceId);
-						break;
-					}
-					if (strategy.getStrategyName().equals("OVERPROVISION")) {
-						for (String deviceId : gpuDevicesInfo.keySet()) {
-							if(gpuDevicesInfo.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
-								if(gpuDevicesInfo.get(deviceId).getGpuUtil() < (allocDevice.getGpuUtil() + 5)
-										&& gpuDevicesInfo.get(deviceId).getGpuUtil() > (allocDevice.getGpuUtil() - 5)){
-									if(gpuDevicesInfo.get(deviceId).getComputeProcessCount() != 0
-											&& gpuDevicesInfo.get(deviceId).getGPUUtilPerCPC() > allocDevice.getGPUUtilPerCPC()) {
-										allocDevice = gpuDevicesInfo.get(deviceId);
-									}
-								}else if(gpuDevicesInfo.get(deviceId).getGpuUtil() <= (allocDevice.getGpuUtil() - 5)) {
-									allocDevice = gpuDevicesInfo.get(deviceId);
-								}
-							}
-						}
-					}
-					LOG.info("Task({}) using {}MB Gpu memory.", gpuReq.getRequestTask(), gpuReq.getRequiredGPUMemory());
-					if(allocDevice != null) {
-						LOG.info("allocDevice = {}, allocDeviceFree = {}/{}", allocDevice.getDeviceId(), allocDevice.getFree(),
-								allocDevice.getTotal());
-					} else {
-						LOG.info("Device is not allocated.");
-					}
-					if ((int) (gpuReq.getRequiredGPUMemory() * 1.1) <= 0) {
-						gpuReq.setStatusAssigned();
-					} else if (allocDevice != null && (int) (gpuReq.getRequiredGPUMemory() * 1.1) < allocDevice.getFree()) {
-						gpuReq.deviceAlloc(allocDevice);
-						allocDevice.allocateMemory((int) (gpuReq.getRequiredGPUMemory() * 1.1),
-								gpuReq.getRequestTask());
-						allocDevice.increaseComputeProcessCount();
-						LOG.info("***Device {} is allocated to {}.", allocDevice.getDeviceId(), gpuReq.getRequestTask());
-						LOG.info("***Device {} now CPC = {}.", allocDevice.getDeviceId(), allocDevice.getComputeProcessCount());
-					} else {
-						gpuReq.setStatusDefault();
-						allAllocated = false;
-					}
+	public void gpuDeviceAssignment() {
+		boolean done = false;
+		while (!done) {
+			LOG.info("GPU assignment type is {}", strategy.getStrategyName());
+			if (strategy.isNecessaryGPUAssignment()) {
+				try {
+					updateGPUDeviceInfo();
+				} catch (NumberFormatException | XPathExpressionException | SAXException
+						| ParserConfigurationException | IOException | InterruptedException e) {
+					e.printStackTrace();
 				}
-				
+				printGPUsInfo();
 			}
-			if (!isAllAllocated() && appExecutionType == AppExecutionType.DISTRIBUTED) {
-				resetGpuDeviceAllocInfo();
+			allAssigned = strategy.gpuAssignment(gpuDevicesInfo, gpuRequests);
+			
+			if(allAssigned) {
+				done = true;
+			} else if (!allAssigned && appExecutionType == AppExecutionType.DISTRIBUTED) {
+				resetGpuRequests();
 			} else if (appExecutionType == AppExecutionType.BATCH) {
-				break;
+				done = true;
 			}
 		}
 		
 	}
 	
-	public void resetGpuDeviceAllocInfo() {
-		for (GPURequest gpuReq : gpuDeviceAllocInfo) {
+	public void resetGpuRequests() {
+		for (MeLoN_GPURequest gpuReq : gpuRequests) {
 			if(gpuReq.isAssigned() && gpuReq.getRequiredGPUMemory() > 0) {
 				gpuReq.resetRequest();
 			}
 		}
 	}
 	
-	public List<GPURequest> getGPUDeviceallocInfo(){
-		return this.gpuDeviceAllocInfo;
+	public List<MeLoN_GPURequest> getGPURequests(){
+		return this.gpuRequests;
 	}
 	
-	public boolean isAllAllocated() {
-		return allAllocated;
+	public boolean isAllAssigned() {
+		return allAssigned;
 	}
 	
 	public synchronized Map<String, String> getGPUDeviceEnv(Container container, MeLoN_Task task) {
 		LOG.info("Container {} getGPUDeviceEnv. task is {}", container.getId(), task.getJobName());
 		Map<String, String> env = new ConcurrentHashMap<>();
-		for (GPURequest gpuReq : gpuDeviceAllocInfo) {
-			if (gpuReq.getRequestTask().equals(task.getJobName()) && gpuReq.getDevice() != null
+		for (MeLoN_GPURequest gpuReq : gpuRequests) {
+			if (gpuReq.getJobName().equals(task.getJobName()) && gpuReq.getDevice() != null
 					&& gpuReq.getDevice().getDeviceHost().equals(container.getNodeId().getHost())
 					&& gpuReq.isRequested()) {
 				gpuReq.setStatusAllocated();
 				gpuReq.setContainerId(container.getId());
 				env.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, String.valueOf(gpuReq.getDevice().getDeviceNum()));
 				env.put(MeLoN_Constants.FRACTION, gpuReq.getFraction());
-				LOG.info("\n***Extra envs set." + "\n***Task = " + task.getJobName() + ":" + task.getTaskIndex()
-						+ "\n***Device = " + gpuReq.getDevice().getDeviceId() + ", Using "
+				LOG.info("Extra envs set. Task = " + task.getJobName() + ":" + task.getTaskIndex()
+						+ " Device = " + gpuReq.getDevice().getDeviceId() + ", Using "
 						+ gpuReq.getRequiredGPUMemory() + "/" + gpuReq.getDevice().getTotal() + "MB, Fraction = "
-						+ gpuReq.getFraction() + "\n***ContainerId = " + container.getId());
+						+ gpuReq.getFraction() + " ContainerId = " + container.getId());
 				break;
-			}else if(gpuReq.getRequestTask().equals(task.getJobName()) && gpuReq.getDevice() == null) {
+			}else if(gpuReq.getJobName().equals(task.getJobName()) && gpuReq.getDevice() == null) {
 				gpuReq.setContainerId(container.getId());
 			}
 		}
@@ -236,7 +198,7 @@ public class MeLoN_GPUAllocator {
 	}
 	
 	public void onTaskCompleted(ContainerId containerId) {
-		for (GPURequest gpuReq : gpuDeviceAllocInfo) {
+		for (MeLoN_GPURequest gpuReq : gpuRequests) {
 			if (gpuReq.isThisContainer(containerId)) {
 				LOG.info("{} is finished.", containerId);
 				gpuReq.finished();

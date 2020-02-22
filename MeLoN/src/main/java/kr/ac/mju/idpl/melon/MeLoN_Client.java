@@ -65,7 +65,7 @@ public class MeLoN_Client {
 
 	// Execution Configurations
 	private AppExecutionType appExecutionType = null;
-	private GPUAllocType gpuAllocType = null;
+	private GPUAssignmentType gpuAssignmentType = null;
 
 	// Configurations
 	private YarnClient yarnClient;
@@ -108,7 +108,7 @@ public class MeLoN_Client {
 		melonConf = new Configuration(false);
 		yarnClient = YarnClient.createYarnClient();
 		appExecutionType = AppExecutionType.DISTRIBUTED;
-		gpuAllocType = GPUAllocType.EXCLUSIVE;
+		gpuAssignmentType = GPUAssignmentType.EXCLUSIVE;
 	}
 
 	private void initOptions() {
@@ -158,8 +158,8 @@ public class MeLoN_Client {
 		executes = buildTaskCommand(pythonVenv, pythonBinaryPath, cliParser.getOptionValue("executes"), taskParams);
 		appExecutionType = AppExecutionType.valueOf(
 				melonConf.get(MeLoN_ConfigurationKeys.EXECUTION_TYPE, MeLoN_ConfigurationKeys.EXECUTION_TYPE_DEFAULT));
-		gpuAllocType = GPUAllocType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.GPU_ALLOCATION_TYPE,
-				MeLoN_ConfigurationKeys.GPU_ALLOCATION_TYPE_DEFAULT));
+		gpuAssignmentType = GPUAssignmentType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.GPU_ASSIGNMENT_TYPE,
+				MeLoN_ConfigurationKeys.GPU_ASSIGNMENT_TYPE_DEFAULT));
 
 		melonConf.set(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND, executes);
 
@@ -510,7 +510,7 @@ public class MeLoN_Client {
 				continue;
 			}
 			for (String resource : resources) {
-				LocalizableResource lr = new LocalizableResource(resource, fs);
+				MeLoN_LocalizableResource lr = new MeLoN_LocalizableResource(resource, fs);
 				// If it is local file, we upload to remote fs first
 				if (lr.isLocalFile()) {
 					Path rsrcPath = lr.getRsrcPath();

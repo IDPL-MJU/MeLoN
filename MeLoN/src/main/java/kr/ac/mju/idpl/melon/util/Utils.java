@@ -25,7 +25,7 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import kr.ac.mju.idpl.melon.LocalizableResource;
+import kr.ac.mju.idpl.melon.MeLoN_LocalizableResource;
 import kr.ac.mju.idpl.melon.MeLoN_ConfigurationKeys;
 import kr.ac.mju.idpl.melon.MeLoN_Constants;
 import kr.ac.mju.idpl.melon.MeLoN_ContainerRequest;
@@ -102,14 +102,13 @@ public class Utils {
 			if (resource != null) {
 				// Check the format of the path, if the path is of path#archive, we set resource
 				// type as ARCHIVE
-				LocalizableResource lr = new LocalizableResource(resource, fs);
+				MeLoN_LocalizableResource lr = new MeLoN_LocalizableResource(resource, fs);
 				if (lr.isDirectory()) {
 					Path dirPath = lr.getRsrcPath();
 					FileStatus[] ls = fs.listStatus(dirPath);
 					for (FileStatus fileStatus : ls) {
 						// We only add first level files.
 						if (!fileStatus.isDirectory()) {
-							LOG.info("***file is dir : " + fileStatus.getPath().toString() + " " + fs);
 							addResource(fileStatus.getPath().toString(), localResources, fs);
 						}
 					}

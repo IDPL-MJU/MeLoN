@@ -24,7 +24,7 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
  * at the end, the file will be uploaded as ARCHIVE type and unzipped upon
  * localization.
  */
-public class LocalizableResource {
+public class MeLoN_LocalizableResource {
 	private String rsrcFormedString;
 	private Path rsrcPath;
 	private FileStatus rsrcFileStatus;
@@ -32,7 +32,7 @@ public class LocalizableResource {
 	private boolean isDirectory;
 	private String localizedFileName;
 
-	public LocalizableResource(String rsrcFormedString, FileSystem fs) throws IOException, ParseException {
+	public MeLoN_LocalizableResource(String rsrcFormedString, FileSystem fs) throws IOException, ParseException {
 		this.rsrcFormedString = rsrcFormedString;
 		this.parse(fs);
 	}
@@ -58,6 +58,7 @@ public class LocalizableResource {
 	}
 
 	private void parse(FileSystem fs) throws IOException, ParseException {
+		// resource string form : file_path[::localize_file_name][#archive]
 		String filePath = rsrcFormedString;
 		if (rsrcFormedString.toLowerCase().endsWith(MeLoN_Constants.ARCHIVE_SUFFIX)) {
 			rsrcType = LocalResourceType.ARCHIVE;

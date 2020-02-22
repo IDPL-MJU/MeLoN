@@ -8,7 +8,7 @@ import org.apache.hadoop.security.token.TokenInfo;
 import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.security.client.ClientToAMTokenSelector;
 
-import kr.ac.mju.idpl.melon.measure.ExecutorExecutionResult;
+import kr.ac.mju.idpl.melon.measurement.ExecutorExecutionResult;
 
 @TokenInfo(ClientToAMTokenSelector.class)
 @ProtocolInfo(protocolName = "kr.ac.mju.idpl.melon.rpc.RPCProtocol", protocolVersion = 0)
