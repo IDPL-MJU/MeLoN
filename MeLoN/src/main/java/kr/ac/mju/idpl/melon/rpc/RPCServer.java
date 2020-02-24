@@ -134,8 +134,6 @@ public class RPCServer extends Thread implements RPCProtocol {
 	}
 
 	public static class Builder {
-//		private String jvmArgs;
-//		private Configuration melonConf;
 		private String hostname;
 		private Configuration yarnConf;
 
@@ -143,15 +141,6 @@ public class RPCServer extends Thread implements RPCProtocol {
 			return new RPCServer(this);
 		}
 
-//		public Builder setTaskExecutorJVMArgs(String jvmArgs) {
-//			this.jvmArgs = jvmArgs;
-//			return this;
-//		}
-//
-//		public Builder setMelonConf(Configuration melonConf) {
-//			this.melonConf = melonConf;
-//			return this;
-//		}
 
 		public Builder setHostname(String hostname) {
 			this.hostname = hostname;

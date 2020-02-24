@@ -35,6 +35,7 @@ public class MeLoN_Constants {
 	public static final String TASK_INDEX = "TASK_INDEX";
 	public static final String TASK_NUM = "TASK_NUM";
 	public static final String CLUSTER_SPEC = "CLUSTER_SPEC";
+	
 	// public static final String SESSION_ID = "SESSION_ID";
 
 	public static final String AM_HOST = "AM_HOST";

@@ -50,7 +50,7 @@ public class Overprovision implements GPUAssignmentStrategy {
 					gpuReq.setStatusAssigned();
 				} else if (assignDevice != null && (int) (gpuReq.getRequiredGPUMemory() * 1.1) < assignDevice.getFree()) {
 					gpuReq.deviceAssign(assignDevice);
-					assignDevice.allocateMemory((int) (gpuReq.getRequiredGPUMemory() * 1.1),
+					assignDevice.assignMemory((int) (gpuReq.getRequiredGPUMemory() * 1.1),
 							gpuReq.getJobName());
 					assignDevice.increaseComputeProcessCount();
 				} else {

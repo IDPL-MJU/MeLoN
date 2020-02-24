@@ -96,9 +96,11 @@ public class MeLoN_TaskExecutor {
 			shellEnvs.put(MeLoN_Constants.CLUSTER_SPEC, String.valueOf(clusterSpec));
 		}
 		
+		// set environments for CUDA
 		shellEnvs.put(MeLoN_Constants.PATH, "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/hadoop/anaconda3/bin:/usr/java/bin");
 		shellEnvs.put(MeLoN_Constants.LD_LIBRARY_PATH, "/usr/local/cuda-10.0/lib64");
 		shellEnvs.put(MeLoN_Constants.CUDA_DEVICE_ORDER, "PCI_BUS_ID");
+		
 		shellEnvs.put(MeLoN_Constants.APP_ID, System.getenv(MeLoN_Constants.APP_ID));
 		if(System.getenv(MeLoN_Constants.CUDA_VISIBLE_DEVICES) != null) {
 			shellEnvs.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, System.getenv(MeLoN_Constants.CUDA_VISIBLE_DEVICES));

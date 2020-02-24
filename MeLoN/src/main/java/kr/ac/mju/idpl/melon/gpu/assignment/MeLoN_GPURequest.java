@@ -107,7 +107,7 @@ public class MeLoN_GPURequest {
 	public void finished() {
 		if(this.device != null) {
 			this.device.decreaseComputeProcessCount();
-			this.device.deallocateMemory(requiredGPUMemory, jobName);
+			this.device.deassignMemory(requiredGPUMemory, jobName);
 			this.device = null;
 		}
 		setStatusFinished();
@@ -115,7 +115,7 @@ public class MeLoN_GPURequest {
 	
 	public void resetRequest() {
 		this.device.decreaseComputeProcessCount();
-		this.device.deallocateMemory((int) (this.requiredGPUMemory * 1.1), this.jobName);
+		this.device.deassignMemory((int) (this.requiredGPUMemory * 1.1), this.jobName);
 		this.device = null;
 		setStatusStandby();
 	}
