@@ -43,8 +43,8 @@ import kr.ac.mju.idpl.melon.MeLoN_Constants.GPUAssignmentType;
 import kr.ac.mju.idpl.melon.MeLoN_Task.TaskStatus;
 import kr.ac.mju.idpl.melon.gpu.assignment.*;
 import kr.ac.mju.idpl.melon.gpu.assignment.strategy.*;
-import kr.ac.mju.idpl.melon.measurement.AppExecutionResult;
-import kr.ac.mju.idpl.melon.measurement.ExecutorExecutionResult;
+import kr.ac.mju.idpl.melon.metric.AppExecutionResult;
+import kr.ac.mju.idpl.melon.metric.ExecutorExecutionResult;
 import kr.ac.mju.idpl.melon.rpc.RPCServer;
 import kr.ac.mju.idpl.melon.util.Utils;
 

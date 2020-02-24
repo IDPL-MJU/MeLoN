@@ -1,4 +1,4 @@
-package kr.ac.mju.idpl.melon.measurement;
+package kr.ac.mju.idpl.melon.metric;
 
 public class AppExecutionResult {
 	private String applicationId;
