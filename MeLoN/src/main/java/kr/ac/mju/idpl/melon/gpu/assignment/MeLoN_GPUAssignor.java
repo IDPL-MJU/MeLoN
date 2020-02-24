@@ -49,7 +49,7 @@ public class MeLoN_GPUAssignor {
 		this.nodes = nodes;
 		this.strategy = strategy;
 		this.appExecutionType = appExecutionType;
-		strategy.initGpuRequests(gpuRequests, requests);
+		strategy.initGPURequests(gpuRequests, requests);
 	}
 	
 	private int parseMibStrToMbInt(String memoryUsageStr) {
@@ -160,7 +160,7 @@ public class MeLoN_GPUAssignor {
 	
 	public void resetGpuRequests() {
 		for (MeLoN_GPURequest gpuReq : gpuRequests) {
-			if(gpuReq.isAssigned() && gpuReq.getRequiredGPUMemory() > 0) {
+			if(gpuReq.isAssigned() && gpuReq.getGPUMemory() > 0) {
 				gpuReq.resetRequest();
 			}
 		}
@@ -187,7 +187,7 @@ public class MeLoN_GPUAssignor {
 				env.put(MeLoN_Constants.FRACTION, gpuReq.getFraction());
 				LOG.info("Extra envs set. Task = " + task.getJobName() + ":" + task.getTaskIndex()
 						+ " Device = " + gpuReq.getDevice().getDeviceId() + ", Using "
-						+ gpuReq.getRequiredGPUMemory() + "/" + gpuReq.getDevice().getTotal() + "MB, Fraction = "
+						+ gpuReq.getGPUMemory() + "/" + gpuReq.getDevice().getTotal() + "MB, Fraction = "
 						+ gpuReq.getFraction() + " ContainerId = " + container.getId());
 				break;
 			}else if(gpuReq.getJobName().equals(task.getJobName()) && gpuReq.getDevice() == null) {

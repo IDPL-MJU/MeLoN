@@ -18,7 +18,7 @@ public class Overprovision implements GPUAssignmentStrategy {
 		return strategyName;
 	}
 	@Override
-	public void initGpuRequests(List<MeLoN_GPURequest> gpuRequests, List<MeLoN_ContainerRequest> requests) {
+	public void initGPURequests(List<MeLoN_GPURequest> gpuRequests, List<MeLoN_ContainerRequest> requests) {
 		for (MeLoN_ContainerRequest request : requests) {
 			gpuRequests.add(new MeLoN_GPURequest(request.getJobName(), request.getGpuMemory()));
 		}
@@ -34,7 +34,7 @@ public class Overprovision implements GPUAssignmentStrategy {
 					break;
 				}
 				for (String deviceId : gpuDevicesInfo.keySet()) {
-					if(gpuDevicesInfo.get(deviceId).getFree() > gpuReq.getRequiredGPUMemory() * 1.1) {
+					if(gpuDevicesInfo.get(deviceId).getFree() > gpuReq.getGPUMemory() * 1.1) {
 						if(gpuDevicesInfo.get(deviceId).getGpuUtil() < (assignDevice.getGpuUtil() + 5)
 								&& gpuDevicesInfo.get(deviceId).getGpuUtil() > (assignDevice.getGpuUtil() - 5)){
 							if(gpuDevicesInfo.get(deviceId).getComputeProcessCount() != 0
@@ -46,11 +46,11 @@ public class Overprovision implements GPUAssignmentStrategy {
 						}
 					}
 				}
-				if ((int) (gpuReq.getRequiredGPUMemory() * 1.1) <= 0) {
+				if ((int) (gpuReq.getGPUMemory() * 1.1) <= 0) {
 					gpuReq.setStatusAssigned();
-				} else if (assignDevice != null && (int) (gpuReq.getRequiredGPUMemory() * 1.1) < assignDevice.getFree()) {
+				} else if (assignDevice != null && (int) (gpuReq.getGPUMemory() * 1.1) < assignDevice.getFree()) {
 					gpuReq.deviceAssign(assignDevice);
-					assignDevice.assignMemory((int) (gpuReq.getRequiredGPUMemory() * 1.1),
+					assignDevice.assignMemory((int) (gpuReq.getGPUMemory() * 1.1),
 							gpuReq.getJobName());
 					assignDevice.increaseComputeProcessCount();
 				} else {

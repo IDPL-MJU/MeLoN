@@ -7,8 +7,8 @@ public class MeLoN_GPURequest {
 	private MeLoN_GPUDeviceInfo device;
 	private String jobName;
 	private ContainerId containerId;
-	private int requiredGPUMemory;
-	private Status requestStatus;
+	private int gpuMemory;
+	private Status status;
 	private enum Status {
 		STANDBY,
 		ASSIGNED,
@@ -17,10 +17,10 @@ public class MeLoN_GPURequest {
 		FINISHED
 	}
 	
-	public MeLoN_GPURequest(String jobName, int requiredGPUMemory) {
+	public MeLoN_GPURequest(String jobName, int gpuMemory) {
 		this.device = null;
 		this.jobName = jobName;
-		this.requiredGPUMemory = requiredGPUMemory;
+		this.gpuMemory = gpuMemory;
 		setStatusStandby();
 	}
 	
@@ -36,16 +36,16 @@ public class MeLoN_GPURequest {
 		return containerId;
 	}
 
-	public int getRequiredGPUMemory() {
-		return requiredGPUMemory;
+	public int getGPUMemory() {
+		return gpuMemory;
 	}
 
 	public Status getRequestStatus() {
-		return requestStatus;
+		return status;
 	}
 	
 	public String getFraction() {
-		return "0." + String.format("%03d", (int) (this.requiredGPUMemory * 1000 / this.device.getTotal()));
+		return "0." + String.format("%03d", (int) (this.gpuMemory * 1000 / this.device.getTotal()));
 	}
 
 	public void setContainerId(ContainerId containerId) {
@@ -53,43 +53,43 @@ public class MeLoN_GPURequest {
 	}
 	
 	public void setStatusAssigned() {
-		this.requestStatus = Status.ASSIGNED;
+		this.status = Status.ASSIGNED;
 	}
 	
 	public void setStatusStandby() {
-		this.requestStatus = Status.STANDBY;
+		this.status = Status.STANDBY;
 	}
 	
 	public void setStatusRequested() {
-		this.requestStatus = Status.REQUESTED;
+		this.status = Status.REQUESTED;
 	}
 
 	public void setStatusAllocated() {
-		this.requestStatus = Status.ALLOCATED;
+		this.status = Status.ALLOCATED;
 	}
 	
 	public void setStatusFinished() {
-		this.requestStatus = Status.FINISHED;
+		this.status = Status.FINISHED;
 	}
 	
 	public boolean isAssigned() {
-		return this.requestStatus == Status.ASSIGNED;
+		return this.status == Status.ASSIGNED;
 	}
 	
 	public boolean isStandby() {
-		return this.requestStatus == Status.STANDBY;
+		return this.status == Status.STANDBY;
 	}
 	
 	public boolean isRequested() {
-		return this.requestStatus == Status.REQUESTED;
+		return this.status == Status.REQUESTED;
 	}
 	
 	public boolean isAllocated() {
-		return this.requestStatus == Status.ALLOCATED;
+		return this.status == Status.ALLOCATED;
 	}
 	
 	public boolean isFinished() {
-		return this.requestStatus == Status.FINISHED;
+		return this.status == Status.FINISHED;
 	}
 	
 	public boolean isDeviceAllocated() {
@@ -107,7 +107,7 @@ public class MeLoN_GPURequest {
 	public void finished() {
 		if(this.device != null) {
 			this.device.decreaseComputeProcessCount();
-			this.device.deassignMemory(requiredGPUMemory, jobName);
+			this.device.deassignMemory(gpuMemory, jobName);
 			this.device = null;
 		}
 		setStatusFinished();
@@ -115,7 +115,7 @@ public class MeLoN_GPURequest {
 	
 	public void resetRequest() {
 		this.device.decreaseComputeProcessCount();
-		this.device.deassignMemory((int) (this.requiredGPUMemory * 1.1), this.jobName);
+		this.device.deassignMemory((int) (this.gpuMemory * 1.1), this.jobName);
 		this.device = null;
 		setStatusStandby();
 	}

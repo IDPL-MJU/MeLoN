@@ -19,7 +19,7 @@ public class Exclusive implements GPUAssignmentStrategy {
 	}
 
 	@Override
-	public void initGpuRequests(List<MeLoN_GPURequest> gpuRequests, List<MeLoN_ContainerRequest> requests) {
+	public void initGPURequests(List<MeLoN_GPURequest> gpuRequests, List<MeLoN_ContainerRequest> requests) {
 	}
 
 	@Override
