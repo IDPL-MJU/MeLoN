@@ -81,7 +81,6 @@ public class MeLoN_Client {
 	private long amMemory;
 	private int amVCores;
 	private int amGpus;
-	private String dist_shell = null;
 	private String taskParams = null;
 	private String pythonBinaryPath = null;
 	private String pythonVenv = null;
@@ -293,9 +292,7 @@ public class MeLoN_Client {
 			}
 			LOG.info("The container task command was builded. [ " + containerCmd + " ]");
 			return containerCmd;
-		} else if (dist_shell != null) {
-			return dist_shell;
-		} else {
+		}  else {
 			LOG.info(
 					"The container task command wasn't builded. (There is no option value 'executes' in the command line.");
 			return null;
