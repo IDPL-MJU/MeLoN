@@ -26,6 +26,7 @@ public class MeLoN_ConfigurationKeys {
 	public static final String YARN_CONF_PATH = APPLICATION_PREFIX + "yarn-conf-path";
 	public static final String EXECUTION_TYPE = APPLICATION_PREFIX + "execution-type";
 	public static final String GPU_ALLOCATION_MODE = APPLICATION_PREFIX + "gpu-alloc";
+	public static final String FILE_SYSTEM_TYPE = APPLICATION_PREFIX + "file-system";
 
 	public static final String PYTHON_VENV = APPLICATION_PREFIX + "python-venv";
 	public static final String PYTHON_BIN_PATH = APPLICATION_PREFIX + "python-bin-path";

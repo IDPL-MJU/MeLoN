@@ -51,6 +51,7 @@ public class MeLoN_Constants {
 	public static final String FRACTION = "FRACTION";
 	public enum AppExecutionType {BATCH, DISTRIBUTED, TEST_CLIENT, TEST_AM, TEST_SHELL}
 	public enum GPUAllocType {EXCLUSIVE, OVERPROVISION}
+	public enum FileSystemType {HDFS, LUSTRE}
 	
 	//FileSystem
 	public static final String LUSTRE_FILESYSTEM_URI = "/mnt/lustre";

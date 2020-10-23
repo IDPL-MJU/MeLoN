@@ -66,6 +66,7 @@ public class MeLoN_Client {
 	// Execution Configurations
 	private AppExecutionType appExecutionType = null;
 	private GPUAllocType gpuAllocType = null;
+	private FileSystemType fileSystemType = null;
 
 	// Configurations
 	private YarnClient yarnClient;
@@ -97,9 +98,7 @@ public class MeLoN_Client {
 	private FileSystem fs;
 
 	private final String melonAMClass = MeLoN_ApplicationMaster.class.getName();
-//	private int appPriority;
 	private String appQueue = "";
-//	private String appUri;
 
 	public MeLoN_Client() {
 		initOptions();
@@ -109,6 +108,7 @@ public class MeLoN_Client {
 		yarnClient = YarnClient.createYarnClient();
 		appExecutionType = AppExecutionType.BATCH;
 		gpuAllocType = GPUAllocType.EXCLUSIVE;
+		fileSystemType = fileSystemType.HDFS;
 	}
 
 	public boolean init(String[] args) throws ParseException, IOException {
@@ -138,7 +138,6 @@ public class MeLoN_Client {
 		pythonVenv = cliParser.getOptionValue("python_venv", "venv.zip");
 		taskParams = cliParser.getOptionValue("task_params");
 		executes = buildTaskCommand(pythonVenv, pythonBinaryPath, cliParser.getOptionValue("executes"), taskParams);
-		
 		if (cliParser.hasOption("app_execution_type")) {
 			appExecutionType = AppExecutionType.valueOf(cliParser.getOptionValue("app_execution_type"));
 			if(appExecutionType == AppExecutionType.TEST_SHELL) {
@@ -153,6 +152,7 @@ public class MeLoN_Client {
 			appExecutionType = AppExecutionType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.EXECUTION_TYPE));
 		}
 		LOG.info("execution_type = " + appExecutionType.name());
+		
 		if (cliParser.hasOption("gpu_alloc_mode")) {
 			gpuAllocType = GPUAllocType.valueOf(cliParser.getOptionValue("gpu_alloc_mode"));
 			melonConf.set(MeLoN_ConfigurationKeys.GPU_ALLOCATION_MODE, gpuAllocType.name());
@@ -161,7 +161,13 @@ public class MeLoN_Client {
 		}
 		LOG.info("gpu_alloc_mode = "+ gpuAllocType.name());
 		
-		
+		if(cliParser.hasOption("file_system_type")) {
+			fileSystemType = FileSystemType.valueOf(cliParser.getOptionValue("file-system-type"));
+			melonConf.set(MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE, fileSystemType.name());
+		}else if(!melonConf.get(MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE).isEmpty()) {
+			fileSystemType = FileSystemType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE));
+		}
+		LOG.info("file_system_type = " + fileSystemType.name());
 
 		melonConf.set(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND, executes);
 
@@ -293,6 +299,7 @@ public class MeLoN_Client {
 		opts.addOption("test_shell", true, "The distributed shell commnad for all container.");
 		opts.addOption("app_execution_type", true, "Batch - BATCH, Distributed - DISTRIBUTED, Test - TEST_CLIENT/TEST_AM/TEST_SHELL. Default : DISTRIBUTED");
 		opts.addOption("gpu_alloc_mode", true, "(WORST, BEST)");
+		opts.addOption("file_system_type", true, "(HDFS, LUSTRE). Default: HDFS");
 		opts.addOption("help", false, "Print usage.");
 	}
 	

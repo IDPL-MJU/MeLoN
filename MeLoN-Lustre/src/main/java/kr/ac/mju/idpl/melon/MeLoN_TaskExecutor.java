@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 
 import kr.ac.mju.idpl.melon.rpc.RPCProtocol;
 import kr.ac.mju.idpl.melon.MeLoN_Constants.AppExecutionType;
+import kr.ac.mju.idpl.melon.MeLoN_Constants.FileSystemType;
 import kr.ac.mju.idpl.melon.util.Utils;
 
 public class MeLoN_TaskExecutor {
@@ -29,6 +30,7 @@ public class MeLoN_TaskExecutor {
 	private String jobName;
 	private int taskIndex;
 	private int numTasks;
+	private String appIdString;
 	private String taskId;
 	private String amHost;
 	private int amPort;
@@ -41,7 +43,8 @@ public class MeLoN_TaskExecutor {
 	private Configuration yarnConf = new Configuration(false);
 	private Configuration hdfsConf = new Configuration(false);
 	private int exitCode = -1;
-	private AppExecutionType appExecutionType;
+	private AppExecutionType appExecutionType = null;
+	private FileSystemType fileSystemType = null;
 	
 	private long processStartTime;
 	private long processingFinishTime;
@@ -189,6 +192,12 @@ public class MeLoN_TaskExecutor {
 		amPort = Integer.parseInt(System.getenv(MeLoN_Constants.AM_PORT));
 
 		melonConf.addResource(new Path(MeLoN_Constants.MELON_FINAL_XML));
+		appExecutionType = AppExecutionType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.EXECUTION_TYPE));
+		fileSystemType = FileSystemType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE));
+		Map<String, String> envs = System.getenv();
+		appIdString = System.getenv("APP_ID");
+		LOG.info("applicationId : " + appIdString);
+		
 		String[] shellEnvsStr = melonConf.getStrings(MeLoN_ConfigurationKeys.SHELL_ENVS);
 		shellEnvs = Utils.parseKeyValue(shellEnvsStr);
 		

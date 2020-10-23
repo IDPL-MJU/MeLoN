@@ -31,7 +31,7 @@ public class MeLoN_Lustre {
 		LOG.info("Copy src folder to Lustre");
 		lustreCommand(copySrc);
 		LOG.info("Unzip venv.zip");
-		extractVenv(appIdDir);
+		//extractVenv(appIdDir);
 	}
 	
 	public static void lustreCommand(String[] cmd) {
