@@ -496,26 +496,30 @@ public class MeLoN_Client {
 
 	private String processMelonFinalConf() throws IOException, ParseException {
 		FileSystem fs = FileSystem.get(hdfsConf);
-		if (srcDir != null) {
-			LOG.info("Uploading src directory...");
-			if (Utils.isArchive(srcDir)) {
-				uploadFileAndSetConfResources(new Path(srcDir), fs, appResourcesPath,
-						MeLoN_Constants.MELON_SRC_ZIP_NAME, LocalResourceType.FILE,
-						MeLoN_ConfigurationKeys.CONTAINER_RESOURCES, melonConf);
-			} else {
-				LOG.info("Zipping the src directory to upload ...");
-				zipFolder(Paths.get(srcDir), Paths.get(MeLoN_Constants.MELON_SRC_ZIP_NAME));
-				uploadFileAndSetConfResources(new Path(MeLoN_Constants.MELON_SRC_ZIP_NAME), fs, appResourcesPath,
-						MeLoN_Constants.MELON_SRC_ZIP_NAME, LocalResourceType.FILE,
+		if (fileSystemType == FileSystemType.HDFS) {
+			if (srcDir != null) {
+				LOG.info("Uploading src directory...");
+				if (Utils.isArchive(srcDir)) {
+					uploadFileAndSetConfResources(new Path(srcDir), fs, appResourcesPath,
+							MeLoN_Constants.MELON_SRC_ZIP_NAME, LocalResourceType.FILE,
+							MeLoN_ConfigurationKeys.CONTAINER_RESOURCES, melonConf);
+				} else {
+					LOG.info("Zipping the src directory to upload ...");
+					zipFolder(Paths.get(srcDir), Paths.get(MeLoN_Constants.MELON_SRC_ZIP_NAME));
+					uploadFileAndSetConfResources(new Path(MeLoN_Constants.MELON_SRC_ZIP_NAME), fs, appResourcesPath,
+							MeLoN_Constants.MELON_SRC_ZIP_NAME, LocalResourceType.FILE,
+							MeLoN_ConfigurationKeys.CONTAINER_RESOURCES, melonConf);
+				}
+			}
+			if (pythonVenv != null) {
+				LOG.info("Uploading a python venv zip file ...");
+				uploadFileAndSetConfResources(new Path(pythonVenv), fs, appResourcesPath,
+						MeLoN_Constants.PYTHON_VENV_ZIP, LocalResourceType.FILE,
 						MeLoN_ConfigurationKeys.CONTAINER_RESOURCES, melonConf);
 			}
+		} else if (fileSystemType == FileSystemType.LUSTRE) {
+			MeLoN_Lustre.copyToLustre(appId.toString());// lustre
 		}
-		if (pythonVenv != null) {
-			LOG.info("Uploading a python venv zip file ...");
-			uploadFileAndSetConfResources(new Path(pythonVenv), fs, appResourcesPath, MeLoN_Constants.PYTHON_VENV_ZIP,
-					LocalResourceType.FILE, MeLoN_ConfigurationKeys.CONTAINER_RESOURCES, melonConf);
-		}
-		MeLoN_Lustre.copyToLustre(appId.toString());//lustre
 		URL coreSiteUrl = yarnConf.getResource(MeLoN_Constants.CORE_SITE_CONF);
 		if (coreSiteUrl != null) {
 			uploadFileAndSetConfResources(new Path(coreSiteUrl.getPath()), fs, appResourcesPath,
@@ -663,6 +667,7 @@ public class MeLoN_Client {
 
 	public static void main(String[] args) {
 		int exitCode = -1;
+		long startTime = System.currentTimeMillis();
 		try {
 			MeLoN_Client client = new MeLoN_Client();
 			boolean doInit = client.init(args);
@@ -678,6 +683,9 @@ public class MeLoN_Client {
 		if (exitCode == 0) {
 			LOG.info("Application submitted successfully.");
 		}
+		long stopTime = System.currentTimeMillis();
+		long executionTime = stopTime - startTime;
+		LOG.info("Client Execution Time : " + executionTime/1000);
 		System.exit(exitCode);
 
 	}

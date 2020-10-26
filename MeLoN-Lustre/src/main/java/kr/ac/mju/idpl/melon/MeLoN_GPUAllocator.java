@@ -1,7 +1,9 @@
 package kr.ac.mju.idpl.melon;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.util.HashMap;
@@ -34,6 +36,7 @@ public class MeLoN_GPUAllocator {
 	private Map<String, GPUDeviceInfo> nodeGPUInfoMap = new HashMap<>();
 	private GPUAllocType gpuAllocType;
 	private List<GPURequest> gpuDeviceAllocInfo = new Vector<>();
+	private String xml;
 	
 	private boolean allAllocated;
 	
@@ -65,21 +68,32 @@ public class MeLoN_GPUAllocator {
 		for (String host : nodes) {
 			// LOG.info("=================================");
 			// LOG.info("Host = {}", host);
-			ProcessBuilder monitoringProcessBuilder = new ProcessBuilder("sh", "-c",
-					"sshpass -p hadoop ssh -T -oStrictHostKeyChecking=no hadoop@" + host + " nvidia-smi -q -x");
+			ProcessBuilder monitoringProcessBuilder = new ProcessBuilder("/bin/sh", "-c",
+					"ssh hduser@" + host + " nvidia-smi -q -x");
 			Process monitoringProcess = monitoringProcessBuilder.start();
-			monitoringProcess.waitFor();
+			//monitoringProcess.waitFor();
 			BufferedReader br = new BufferedReader(new InputStreamReader(monitoringProcess.getInputStream()));
-
-			String result = "";
+			StringBuilder sb = new StringBuilder();
+			
+			while(true) {
+				String line = br.readLine();
+				if (line == null) {
+					break;
+				}
+				sb.append(line);
+			}
+			monitoringProcess.waitFor();
+			xml = sb.toString();
+			br.close();
+			/*
 			String line;
 			for (int i = 0; (line = br.readLine()) != null; i++) {
 				// skip xml document spec
 				if (i > 1) {
 					result = result + line.trim();
 				}
-			}
-			InputSource is = new InputSource(new StringReader(result));
+			}*/
+			InputStream is = new ByteArrayInputStream(xml.getBytes());
 			Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(is);
 			XPath xPath = XPathFactory.newInstance().newXPath();
 			String expression = "/nvidia_smi_log/attached_gpus";

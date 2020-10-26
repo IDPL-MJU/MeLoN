@@ -303,8 +303,8 @@ public class MeLoN_ApplicationMaster {
 		}
 		finishTime = System.currentTimeMillis();
 		ProcessBuilder monitoringProcessBuilder = new ProcessBuilder("sh", "-c",
-				"sshpass -p hadoop ssh -T -oStrictHostKeyChecking=no hadoop@master.idpl.org "
-				+ "touch /home/hadoop/melon/experiment/result/" + appIdString + "_1_finish");
+				"sshpass -p hadoop ssh -T -oStrictHostKeyChecking=no hduser@master.idpl.org "
+				+ "touch /home/hduser/melon/experiment/result/" + appIdString + "_1_finish");
 		Process monitoringProcess = monitoringProcessBuilder.start();
 		monitoringProcess.waitFor();
 		appExecutionTime = finishTime - appStartTime;
