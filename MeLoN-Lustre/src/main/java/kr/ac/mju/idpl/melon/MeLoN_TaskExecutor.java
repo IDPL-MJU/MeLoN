@@ -75,7 +75,11 @@ public class MeLoN_TaskExecutor {
 	private int run() throws Exception {
 		executorStartTime = System.currentTimeMillis();
 		initConfigs();
-		Utils.extractResources();
+		if (fileSystemType.toString().equals("HDFS")) {
+			Utils.extractResources();
+		}else if (fileSystemType.toString().equals("LUSTRE")) {
+			MeLoN_Lustre.extractVenv(MeLoN_Constants.LUSTRE_FILESYSTEM_URI + File.separator + appIdString);
+		}
 
 		LOG.info("This container's jobName is {}", jobName);
 		InetSocketAddress addr = new InetSocketAddress(amHost, amPort);
@@ -194,7 +198,6 @@ public class MeLoN_TaskExecutor {
 		melonConf.addResource(new Path(MeLoN_Constants.MELON_FINAL_XML));
 		appExecutionType = AppExecutionType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.EXECUTION_TYPE));
 		fileSystemType = FileSystemType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE));
-		Map<String, String> envs = System.getenv();
 		appIdString = System.getenv("APP_ID");
 		LOG.info("applicationId : " + appIdString);
 		
@@ -206,11 +209,38 @@ public class MeLoN_TaskExecutor {
 		if (taskCommand == null) {
 			LOG.error("Task command is empty. Please see task command in configuration files.");
 			throw new IllegalArgumentException();
+		}else {
+			taskCommand = buildTaskCommand(taskCommand, appIdString);
 		}
 		LOG.info("Task command: " + taskCommand);
 
 		Utils.initYarnConf(yarnConf);
 		Utils.initHdfsConf(hdfsConf);
+	}
+	
+	//Lustre
+	private String buildTaskCommand(String command, String appId) {
+		String TaskCommand = null;
+		if (fileSystemType.toString().equals("LUSTRE")) {
+			LOG.info("File_System_type is " + fileSystemType.toString());
+			String lustreUrl = MeLoN_Constants.LUSTRE_FILESYSTEM_URI + File.separator + appId + File.separator;
+			String[] tmpCommand = command.split(" ");
+			TaskCommand = lustreUrl + tmpCommand[0] + " " + lustreUrl + "src" + File.separator + tmpCommand[1];
+			if (tmpCommand.length >= 3) {
+				for(int i=2;i<tmpCommand.length;i++) {
+					TaskCommand += " " + tmpCommand[i];
+				}
+			}
+		} else if (fileSystemType.toString().equals("HDFS")) {
+			TaskCommand = command;
+		}
+		if (TaskCommand.isEmpty()) {
+			LOG.info("Failed to build TaskCommand");
+			return null;
+		}else {
+			LOG.info("Established Task Command " + command + " change to " + TaskCommand);
+			return TaskCommand;
+		}
 	}
 
 	private void releasePorts() throws IOException {
