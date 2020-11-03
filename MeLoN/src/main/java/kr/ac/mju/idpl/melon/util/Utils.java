@@ -53,7 +53,7 @@ public class Utils {
 		File venvZip = new File(MeLoN_Constants.PYTHON_VENV_ZIP);
 		if (venvZip.exists() && venvZip.isFile()) {
 			LOG.info("Unpacking Python virtual environment..");
-			Utils.unzipArchive(MeLoN_Constants.PYTHON_VENV_ZIP, MeLoN_Constants.PYTHON_VENV_DIR);
+			Utils.unzipArchive(MeLoN_Constants.PYTHON_VENV_ZIP, MeLoN_Constants.PYTHON_VENV_ZIP_DIR);
 		} else {
 			LOG.info("No virtual environment uploaded.");
 		}
@@ -195,6 +195,7 @@ public class Utils {
 		Set<String> jobNames = getAllJobNames(conf);
 		Map<String, MeLoN_ContainerRequest> containerRequests = new HashMap<>();
 		int priority = 0;
+		LOG.info(jobNames.toString());
 		for (String jobName : jobNames) {
 			int numInstances = conf.getInt("melon." + jobName + ".instances", 0);
 			long memory = Long.parseLong(parseMemoryString(conf.get("melon." + jobName + ".memory", "2g")));

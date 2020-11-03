@@ -64,8 +64,8 @@ public class MeLoN_GPUAssignor {
 	public void updateGPUDeviceInfo() throws IOException, InterruptedException, SAXException,
 			ParserConfigurationException, NumberFormatException, XPathExpressionException {
 		for (String host : nodes) {
-			ProcessBuilder monitoringProcessBuilder = new ProcessBuilder("sh", "-c",
-					"sshpass -p hadoop ssh -T -oStrictHostKeyChecking=no hadoop@" + host + " nvidia-smi -q -x");
+			ProcessBuilder monitoringProcessBuilder = new ProcessBuilder("/bin/sh", "-c",
+					"ssh hduser@" + host + " nvidia-smi -q -x");
 			Process monitoringProcess = monitoringProcessBuilder.start();
 			monitoringProcess.waitFor();
 			BufferedReader br = new BufferedReader(new InputStreamReader(monitoringProcess.getInputStream()));
@@ -78,6 +78,7 @@ public class MeLoN_GPUAssignor {
 					result = result + line.trim();
 				}
 			}
+			LOG.info(result);
 			InputSource is = new InputSource(new StringReader(result));
 			Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(is);
 			XPath xPath = XPathFactory.newInstance().newXPath();

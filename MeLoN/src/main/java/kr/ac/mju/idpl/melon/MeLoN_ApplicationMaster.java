@@ -108,7 +108,7 @@ public class MeLoN_ApplicationMaster {
 	private List<Thread> launchTreads = new ArrayList<Thread>();
 	private Options opts;
 
-	private String[] nodes = new String[] { "master.hadoop.com", "slave1.hadoop.com", "slave2.hadoop.com" };
+	private String[] nodes = new String[] { "master", "slave1", "slave2" };
 	private Map<String, MeLoN_GPUDeviceInfo> nodeGPUInfoMap = new HashMap<>();
 
 	public MeLoN_ApplicationMaster() throws Exception {
@@ -145,8 +145,8 @@ public class MeLoN_ApplicationMaster {
 		containerId = ContainerId.fromString(envs.get(ApplicationConstants.Environment.CONTAINER_ID.name()));
 		appIdString = containerId.getApplicationAttemptId().getApplicationId().toString();
 //		hdfsClasspath = cliParser.getOptionValue("hdfs_classpath");
-		appExecutionType = AppExecutionType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.EXECUTION_TYPE).toUpperCase());
-		gpuAssignmentType = GPUAssignmentType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.GPU_ASSIGNMENT_TYPE).toUpperCase());
+		appExecutionType = AppExecutionType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.EXECUTION_TYPE));
+		gpuAssignmentType = GPUAssignmentType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.GPU_ASSIGNMENT_TYPE));
 
 		return true;
 	}
@@ -210,10 +210,15 @@ public class MeLoN_ApplicationMaster {
 			if (!allReq) {
 				gpuAssignor.gpuDeviceAssignment();
 				allReq = true;
+				int a = 0;
 				for (MeLoN_ContainerRequest request : requests) {
 					LOG.info("Requesting container ...");
 					ContainerRequest containerAsk = setupContainerAskForRM(request);
 					if (containerAsk != null) {
+						LOG.info(containerAsk.toString());
+						/*if (request.getJobName().equals("worker")) {
+							a++;
+						}*/
 						if (!askedContainerMap.containsKey(request.getJobName())) {
 							askedContainerMap.put(request.getJobName(), new ArrayList<>());
 						}
@@ -359,7 +364,7 @@ public class MeLoN_ApplicationMaster {
 			done = true;
 		}
 		if (done) {
-			containerAsk = new ContainerRequest(capability, node, null, priority, false);
+			containerAsk = new ContainerRequest(capability, node, null, priority, true);
 		}
 		return containerAsk;
 	}

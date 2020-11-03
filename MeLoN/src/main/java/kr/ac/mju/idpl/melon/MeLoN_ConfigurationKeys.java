@@ -10,24 +10,24 @@ public class MeLoN_ConfigurationKeys {
 	public static final String YARN_QUEUE_NAME = MELON_PREFIX + "yarn.queue";
 	public static final String YARN_QUEUE_NAME_DEFAULT = "default";
 	public static final String AM_PREFIX = MELON_PREFIX + "am.";
-	public static final String AM_MEMORY = MELON_PREFIX + AM_PREFIX + "memory";
+	public static final String AM_MEMORY = AM_PREFIX + "memory";
 	public static final String AM_MEMORY_DEFAULT = "1024";
-	public static final String AM_VCORES = MELON_PREFIX + AM_PREFIX + "vcores";
+	public static final String AM_VCORES = AM_PREFIX + "vcores";
 	public static final int AM_VCORES_DEFAULT = 1;
-	public static final String AM_GPUS = MELON_PREFIX + AM_PREFIX + "gpus";
+	public static final String AM_GPUS = AM_PREFIX + "gpus";
 	public static final int AM_GPUS_DEFAULT = 0;
-	public static final String AM_GPU_MEMORY = MELON_PREFIX + AM_PREFIX + "gpu-memory-mb";
+	public static final String AM_GPU_MEMORY = AM_PREFIX + "gpu-memory-mb";
 	public static final int AM_GPU_MEMORY_DEFAULT = 0;
 
 	public static final String APPLICATION_PREFIX = MELON_PREFIX + "application.";
-	public static final String APPLICATION_NAME = MELON_PREFIX + APPLICATION_PREFIX + "name";
+	public static final String APPLICATION_NAME = APPLICATION_PREFIX + "name";
 	public static final String APPLICATION_NAME_DEFAULT = "melon";
-	public static final String HDFS_CONF_PATH = MELON_PREFIX + APPLICATION_PREFIX + "hdfs-conf-path";
-	public static final String YARN_CONF_PATH = MELON_PREFIX + APPLICATION_PREFIX + "yarn-conf-path";
-	public static final String EXECUTION_TYPE = MELON_PREFIX + APPLICATION_PREFIX + "execution-type";
-	public static final String EXECUTION_TYPE_DEFAULT = "batch";
-	public static final String GPU_ASSIGNMENT_TYPE = MELON_PREFIX + APPLICATION_PREFIX + "gpu-assignment-type";
-	public static final String GPU_ASSIGNMENT_TYPE_DEFAULT = "exclusive";
+	public static final String HDFS_CONF_PATH = APPLICATION_PREFIX + "hdfs-conf-path";
+	public static final String YARN_CONF_PATH = APPLICATION_PREFIX + "yarn-conf-path";
+	public static final String EXECUTION_TYPE = APPLICATION_PREFIX + "execution-type";
+	public static final String EXECUTION_TYPE_DEFAULT = "BATCH";
+	public static final String GPU_ASSIGNMENT_TYPE = APPLICATION_PREFIX + "gpu-assignment-type";
+	public static final String GPU_ASSIGNMENT_TYPE_DEFAULT = "EXCLUSIVE";
 
 	public static final String PYTHON_VENV = APPLICATION_PREFIX + "python-venv";
 	public static final String PYTHON_BIN_PATH = APPLICATION_PREFIX + "python-bin-path";

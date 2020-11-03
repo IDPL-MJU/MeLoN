@@ -20,6 +20,7 @@ public class MeLoN_Constants {
 	public static final String MELON_SRC_ZIP_NAME = "src.zip";
 	public static final String MELON_SRC_ZIP_DIR = "./";
 	public static final String PYTHON_VENV_ZIP = "venv.zip";
+	public static final String PYTHON_VENV_ZIP_DIR = "./";
 
 	public static final String MELON_CONF_PREFIX = "MELON_CONF";
 	public static final String MELON_JAR_PREFIX = "MELON_JAR";

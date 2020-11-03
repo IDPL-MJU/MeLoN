@@ -207,7 +207,7 @@ public class MeLoN_Client {
 			containerEnvs.putAll(Utils.parseKeyValue(envs));
 		}
 		containerEnvs.put("PATH",
-				"/usr/java/bin:/usr/local/cuda-10.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/hadoop/anaconda3/bin:/usr/java/bin");
+				"/usr/local/hadoop-3.2.1/bin:/usr/local/hadoop-3.2.1/sbin:/usr/local/java/bin:/usr/local/cuda-10.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin");
 		containerEnvs.put("LD_LIBRARY_PATH", "/usr/local/cuda-10.0/lib64");
 		if (!containerEnvs.isEmpty()) {
 			melonConf.setStrings(MeLoN_ConfigurationKeys.CONTAINER_ENVS, containerEnvsPair.toArray(new String[0]));
@@ -352,7 +352,7 @@ public class MeLoN_Client {
 
 		LOG.info("Submitting YARN application" + "[" + appId + "]");
 		yarnClient.submitApplication(appContext);
-		File start = new File("/home/hadoop/melon/experiment/result/" + appId + "_0_start");
+		File start = new File("/home/hduser/melon/experiment/result/" + appId + "_0_start");
 		try {
 			start.createNewFile();
 		} catch (IOException e) {

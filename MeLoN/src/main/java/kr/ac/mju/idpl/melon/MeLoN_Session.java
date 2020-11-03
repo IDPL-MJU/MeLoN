@@ -123,6 +123,9 @@ public class MeLoN_Session {
 				}
 			}
 		}
+		for(int i=0;i<requests.size();i++) {
+			LOG.info(i+"request name:"+requests.get(i).getJobName()+" and numinstance:"+requests.get(i).getNumInstances());
+		}
 		LOG.info("Return containerRequests");
 		return requests;
 	}

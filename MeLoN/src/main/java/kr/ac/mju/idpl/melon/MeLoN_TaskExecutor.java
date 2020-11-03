@@ -97,15 +97,16 @@ public class MeLoN_TaskExecutor {
 		}
 		
 		// set environments for CUDA
-		shellEnvs.put(MeLoN_Constants.PATH, "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin:/home/hadoop/anaconda3/bin:/usr/java/bin");
+		shellEnvs.put(MeLoN_Constants.PATH, "/usr/local/hadoop-3.2.1/bin:/usr/local/hadoop-3.2.1/sbin:/usr/local/java/bin:/usr/local/cuda-10.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin");
 		shellEnvs.put(MeLoN_Constants.LD_LIBRARY_PATH, "/usr/local/cuda-10.0/lib64");
 		shellEnvs.put(MeLoN_Constants.CUDA_DEVICE_ORDER, "PCI_BUS_ID");
 		
 		shellEnvs.put(MeLoN_Constants.APP_ID, System.getenv(MeLoN_Constants.APP_ID));
+		//shellEnvs.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, "0,1");
 		if(System.getenv(MeLoN_Constants.CUDA_VISIBLE_DEVICES) != null) {
 			shellEnvs.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, System.getenv(MeLoN_Constants.CUDA_VISIBLE_DEVICES));
 		}else {
-			shellEnvs.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, "");
+			shellEnvs.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, "0,1");
 		}
 		if(System.getenv(MeLoN_Constants.FRACTION) != null) {
 			shellEnvs.put(MeLoN_Constants.FRACTION, System.getenv(MeLoN_Constants.FRACTION));
