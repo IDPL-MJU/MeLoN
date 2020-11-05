@@ -1,11 +1,11 @@
-package kr.ac.mju.idpl.melon;
+package kr.ac.mju.idpl.melon.metric;
 
 public class AppExecutionResult {
 	private String applicationId;
 	private long appExecutionTime;
 	private long lastSessionExecutionTime;
 	private String appExecutionType;
-	private String gpuAllocMode;
+	private String gpuAssignmentType;
 	private int amMemory;
 	private int amVCores;
 	private int workerMemory;
@@ -25,8 +25,8 @@ public class AppExecutionResult {
 	public void setAppExecutionType(String appExecutionType) {
 		this.appExecutionType = appExecutionType;
 	}
-	public void setGpuAllocMode(String gpuAllocMode) {
-		this.gpuAllocMode = gpuAllocMode;
+	public void setGpuAssignmentType(String gpuAssignmentType) {
+		this.gpuAssignmentType = gpuAssignmentType;
 	}
 	public void setAmMemory(int amMemory) {
 		this.amMemory = amMemory;
@@ -58,8 +58,8 @@ public class AppExecutionResult {
 	public String getAppExecutionType() {
 		return appExecutionType;
 	}
-	public String getGpuAllocMode() {
-		return gpuAllocMode;
+	public String getGpuAssignmentType() {
+		return gpuAssignmentType;
 	}
 	public int getAmMemory() {
 		return amMemory;

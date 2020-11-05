@@ -14,14 +14,14 @@ public class MeLoN_Constants {
 	public static final String HADOOP_CONF_DIR = ApplicationConstants.Environment.HADOOP_CONF_DIR.key();
 
 	public static final String PYTHON_VENV_DIR = "venv";
+	public static final String SRC_DIR = "src";
 
 	public static final String MELON_JAR = "melon.jar";
 	public static final String MELON_FINAL_XML = "melon-final.xml";
 	public static final String MELON_SRC_ZIP_NAME = "src.zip";
 	public static final String MELON_SRC_ZIP_DIR = "./";
-	public static final String MELON_SRC_DIR = "./src";
-	public static final String PYTHON_VENV_ZIP_DIR = "./";
 	public static final String PYTHON_VENV_ZIP = "venv.zip";
+	public static final String PYTHON_VENV_ZIP_DIR = "./";
 
 	public static final String MELON_CONF_PREFIX = "MELON_CONF";
 	public static final String MELON_JAR_PREFIX = "MELON_JAR";
@@ -37,11 +37,13 @@ public class MeLoN_Constants {
 	public static final String TASK_INDEX = "TASK_INDEX";
 	public static final String TASK_NUM = "TASK_NUM";
 	public static final String CLUSTER_SPEC = "CLUSTER_SPEC";
+	
 	// public static final String SESSION_ID = "SESSION_ID";
 
 	public static final String AM_HOST = "AM_HOST";
 	public static final String AM_PORT = "AM_PORT";
 	public static final String APP_EXECUTION_TYPE = "APP_EXECUTION_TYPE";
+	public static final String FILE_SYSTEM_TYPE = "FILE_SYSTEM_TYPE";
 	public static final String APP_ID = "APP_ID";
 
 	public static final String PATH = "PATH";
@@ -49,8 +51,8 @@ public class MeLoN_Constants {
 	public static final String CUDA_DEVICE_ORDER = "CUDA_DEVICE_ORDER";
 	public static final String CUDA_VISIBLE_DEVICES = "CUDA_VISIBLE_DEVICES";
 	public static final String FRACTION = "FRACTION";
-	public enum AppExecutionType {BATCH, DISTRIBUTED, TEST_CLIENT, TEST_AM, TEST_SHELL}
-	public enum GPUAllocType {EXCLUSIVE, OVERPROVISION}
+	public enum AppExecutionType {BATCH, DISTRIBUTED}
+	public enum GPUAssignmentType {EXCLUSIVE, OVERPROVISION}
 	public enum FileSystemType {HDFS, LUSTRE}
 	
 	//FileSystem

@@ -43,8 +43,8 @@ public class MeLoN_TaskExecutor {
 	private Configuration yarnConf = new Configuration(false);
 	private Configuration hdfsConf = new Configuration(false);
 	private int exitCode = -1;
-	private AppExecutionType appExecutionType = null;
-	private FileSystemType fileSystemType = null;
+	private AppExecutionType appExecutionType;
+	private FileSystemType fileSystemType;
 	
 	private long processStartTime;
 	private long processingFinishTime;
@@ -75,11 +75,11 @@ public class MeLoN_TaskExecutor {
 	private int run() throws Exception {
 		executorStartTime = System.currentTimeMillis();
 		initConfigs();
-		if (fileSystemType.toString().equals("HDFS")) {
+		if (fileSystemType == FileSystemType.HDFS) {
 			Utils.extractResources();
-		}else if (fileSystemType.toString().equals("LUSTRE")) {
-			MeLoN_Lustre.extractVenv(MeLoN_Constants.LUSTRE_FILESYSTEM_URI + File.separator + appIdString);
-		}
+		}/* else if (fileSystemType == FileSystemType.LUSTRE) {
+			MeLoN_Lustre.extractVenvandSrc(MeLoN_Constants.LUSTRE_FILESYSTEM_URI + File.separator + appIdString);
+		}*/
 
 		LOG.info("This container's jobName is {}", jobName);
 		InetSocketAddress addr = new InetSocketAddress(amHost, amPort);
@@ -103,16 +103,17 @@ public class MeLoN_TaskExecutor {
 			shellEnvs.put(MeLoN_Constants.CLUSTER_SPEC, String.valueOf(clusterSpec));
 		}
 		
+		// set environments for CUDA
 		shellEnvs.put(MeLoN_Constants.PATH, "/usr/local/hadoop-3.2.1/bin:/usr/local/hadoop-3.2.1/sbin:/usr/local/java/bin:/usr/local/cuda-10.0/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin");
-		shellEnvs.put(MeLoN_Constants.LD_LIBRARY_PATH, "/usr/local/cuda-10.0/extras/CUPTI/lib64:/usr/local/cuda-10.0/lib64");
+		shellEnvs.put(MeLoN_Constants.LD_LIBRARY_PATH, "/usr/local/cuda-10.0/lib64");
 		shellEnvs.put(MeLoN_Constants.CUDA_DEVICE_ORDER, "PCI_BUS_ID");
+		
 		shellEnvs.put(MeLoN_Constants.APP_ID, System.getenv(MeLoN_Constants.APP_ID));
-		shellEnvs.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, "0,1");
-		/*if(System.getenv(MeLoN_Constants.CUDA_VISIBLE_DEVICES) != null) {
+		if(System.getenv(MeLoN_Constants.CUDA_VISIBLE_DEVICES) != null) {
 			shellEnvs.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, System.getenv(MeLoN_Constants.CUDA_VISIBLE_DEVICES));
 		}else {
-			shellEnvs.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, "");
-		}*/
+			shellEnvs.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, "0,1");
+		}
 		if(System.getenv(MeLoN_Constants.FRACTION) != null) {
 			shellEnvs.put(MeLoN_Constants.FRACTION, System.getenv(MeLoN_Constants.FRACTION));
 		}
@@ -156,17 +157,14 @@ public class MeLoN_TaskExecutor {
 
 	private int executeShell() throws IOException, InterruptedException {
 		LOG.info("Executing command: " + taskCommand);
-		if (appExecutionType != AppExecutionType.TEST_SHELL) {
-			String executablePath = taskCommand.trim().split(" ")[0];
-			File executable = new File(executablePath);
-			if (!executable.canExecute()) {
-				if (!executable.setExecutable(true)) {
-					LOG.warn("Failed to make " + executable + " executable");
-				}
+		String executablePath = taskCommand.trim().split(" ")[0];
+		File executable = new File(executablePath);
+		if (!executable.canExecute()) {
+			if (!executable.setExecutable(true)) {
+				LOG.warn("Failed to make " + executable + " executable");
 			}
 		}
 
-		//taskCommand = "unzip -o venv.zip -d ./venv;" + taskCommand;
 		//taskCommand += "; rm -r ./*";
 		LOG.info("Executing command: " + taskCommand);
 		ProcessBuilder taskProcessBuilder = new ProcessBuilder("bash", "-c", taskCommand);
@@ -196,11 +194,8 @@ public class MeLoN_TaskExecutor {
 		amPort = Integer.parseInt(System.getenv(MeLoN_Constants.AM_PORT));
 
 		melonConf.addResource(new Path(MeLoN_Constants.MELON_FINAL_XML));
-		appExecutionType = AppExecutionType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.EXECUTION_TYPE));
 		fileSystemType = FileSystemType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE));
 		appIdString = System.getenv("APP_ID");
-		LOG.info("applicationId : " + appIdString);
-		
 		String[] shellEnvsStr = melonConf.getStrings(MeLoN_ConfigurationKeys.SHELL_ENVS);
 		shellEnvs = Utils.parseKeyValue(shellEnvsStr);
 		
@@ -217,7 +212,7 @@ public class MeLoN_TaskExecutor {
 		Utils.initYarnConf(yarnConf);
 		Utils.initHdfsConf(hdfsConf);
 	}
-	
+
 	//Lustre
 	private String buildTaskCommand(String command, String appId) {
 		String TaskCommand = null;
