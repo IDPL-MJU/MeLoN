@@ -152,9 +152,9 @@ public class MeLoN_ApplicationMaster {
 		gpuAssignmentType = GPUAssignmentType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.GPU_ASSIGNMENT_TYPE));
 		fileSystemType = FileSystemType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE));
 		
-		if(fileSystemType == FileSystemType.LUSTRE) {
+		/*if(fileSystemType == FileSystemType.LUSTRE) {
 			MeLoN_Lustre.extractVenvandSrc(MeLoN_Constants.LUSTRE_FILESYSTEM_URI + File.separator + appIdString);
-		}
+		}*/
 
 		return true;
 	}

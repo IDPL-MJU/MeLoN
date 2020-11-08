@@ -51,7 +51,7 @@ public class MeLoN_Constants {
 	public static final String CUDA_DEVICE_ORDER = "CUDA_DEVICE_ORDER";
 	public static final String CUDA_VISIBLE_DEVICES = "CUDA_VISIBLE_DEVICES";
 	public static final String FRACTION = "FRACTION";
-	public enum AppExecutionType {BATCH, DISTRIBUTED}
+	public enum AppExecutionType {BATCH, DISTRIBUTED, TEST_CLIENT}
 	public enum GPUAssignmentType {EXCLUSIVE, OVERPROVISION}
 	public enum FileSystemType {HDFS, LUSTRE}
 	

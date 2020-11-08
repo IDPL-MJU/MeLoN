@@ -88,6 +88,7 @@ public class MeLoN_Client {
 	private String executes = null;
 	private String srcDir = null;
 	private String melonJarPath = null;
+	private String lustrepath = null;
 	private Configuration melonConf;
 	private String melonFinalConfPath;
 	private Map<String, String> shellEnvs = new HashMap<>();
@@ -113,7 +114,7 @@ public class MeLoN_Client {
 	private void initOptions() {
 		opts = new Options();
 		opts.addOption("appName", true, "Application Name. Default value - melon");
-
+		opts.addOption("lustre_path", true, "The path stored in the lustre");
 		opts.addOption("python_venv", true, "The python virtual environment zip. Default : venv.zip");
 		opts.addOption("python_bin_path", true, "The relative path to python binary. Default : Python/bin/python");
 		opts.addOption("executes", true, "The file to execute on containers.");
@@ -154,13 +155,17 @@ public class MeLoN_Client {
 		pythonBinaryPath = cliParser.getOptionValue("python_bin_path", "bin/python");
 		pythonVenv = cliParser.getOptionValue("python_venv", "venv.zip");
 		taskParams = cliParser.getOptionValue("task_params");
-		executes = buildTaskCommand(pythonVenv, pythonBinaryPath, cliParser.getOptionValue("executes"), taskParams);
+		fileSystemType = FileSystemType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE, 
+				MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE_DEFAULT));
+		if(fileSystemType == FileSystemType.LUSTRE) {
+			lustrepath = cliParser.getOptionValue("lustre_path", "/mnt/lustre/melon");
+		}
+		executes = buildTaskCommand(pythonVenv, pythonBinaryPath, cliParser.getOptionValue("executes"), taskParams, lustrepath);
 		appExecutionType = AppExecutionType.valueOf(
 				melonConf.get(MeLoN_ConfigurationKeys.EXECUTION_TYPE, MeLoN_ConfigurationKeys.EXECUTION_TYPE_DEFAULT));
 		gpuAssignmentType = GPUAssignmentType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.GPU_ASSIGNMENT_TYPE,
 				MeLoN_ConfigurationKeys.GPU_ASSIGNMENT_TYPE_DEFAULT));
-		fileSystemType = FileSystemType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE, 
-				MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE_DEFAULT));
+		
 
 		melonConf.set(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND, executes);
 
@@ -275,18 +280,28 @@ public class MeLoN_Client {
 		LOG.info("Finished initializing YARN configurations...");
 	}
 
-	public String buildTaskCommand(String pythonVenv, String pythonBinaryPath, String executes, String taskParams) {
+	public String buildTaskCommand(String pythonVenv, String pythonBinaryPath, String executes, String taskParams, String lustrepath) {
 		LOG.info("Building a container task command.");
 		if (executes != null) {
 			String containerCmd = executes;
 			String pythonInterpreter;
 			if (pythonBinaryPath != null) {
-				if (pythonBinaryPath.startsWith("/") || pythonVenv == null) {
-					pythonInterpreter = pythonBinaryPath;
-				} else {
-					pythonInterpreter = MeLoN_Constants.PYTHON_VENV_DIR + File.separatorChar + pythonBinaryPath;
+				if (fileSystemType == FileSystemType.HDFS) {
+					if (pythonBinaryPath.startsWith("/") || pythonVenv == null) {
+						pythonInterpreter = pythonBinaryPath;
+					} else {
+						pythonInterpreter = MeLoN_Constants.PYTHON_VENV_DIR + File.separatorChar + pythonBinaryPath;
+					}
+					containerCmd = pythonInterpreter + " " + executes;
+				} else if (fileSystemType == FileSystemType.LUSTRE) {
+					String lustreExecutes = lustrepath + File.separator + MeLoN_Constants.SRC_DIR + File.separator + executes;
+					if (pythonBinaryPath.startsWith("/")) {
+						pythonInterpreter = lustrepath + File.separator + MeLoN_Constants.PYTHON_VENV_DIR + pythonBinaryPath;						
+					} else {
+						pythonInterpreter = lustrepath + File.separator + MeLoN_Constants.PYTHON_VENV_DIR + File.separator + pythonBinaryPath;
+					}
+					containerCmd = pythonInterpreter + " " + lustreExecutes;
 				}
-				containerCmd = pythonInterpreter + " " + executes;
 			}
 			if (taskParams != null) {
 				containerCmd += "" + taskParams;
@@ -316,6 +331,9 @@ public class MeLoN_Client {
 		if (amVCores > maxVCores) {
 			LOG.warn("Truncating requested AM vcores: " + amVCores + " to cluster's max: " + maxVCores);
 			amVCores = maxVCores;
+		}
+		if (appExecutionType == AppExecutionType.TEST_CLIENT) {
+			return 0;
 		}
 
 		// set appContext
@@ -459,10 +477,10 @@ public class MeLoN_Client {
 						MeLoN_ConfigurationKeys.CONTAINER_RESOURCES, melonConf);
 			}
 		} else if (fileSystemType == FileSystemType.LUSTRE) {
-			if (!Utils.isArchive(srcDir)) {
+			/*if (!Utils.isArchive(srcDir)) {
 				LOG.info("Zipping the src directory to upload ...");
 				zipFolder(Paths.get(srcDir), Paths.get(MeLoN_Constants.MELON_SRC_ZIP_NAME));
-			}
+			}*/
 			MeLoN_Lustre.copyToLustre(appId.toString());
 		}
 		

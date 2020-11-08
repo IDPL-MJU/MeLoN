@@ -204,9 +204,9 @@ public class MeLoN_TaskExecutor {
 		if (taskCommand == null) {
 			LOG.error("Task command is empty. Please see task command in configuration files.");
 			throw new IllegalArgumentException();
-		}else {
+		}/*else {
 			taskCommand = buildTaskCommand(taskCommand, appIdString);
-		}
+		}*/
 		LOG.info("Task command: " + taskCommand);
 
 		Utils.initYarnConf(yarnConf);

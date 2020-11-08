@@ -29,6 +29,6 @@ public class Exclusive implements GPUAssignmentStrategy {
 
 	@Override
 	public boolean isNecessaryGPUAssignment() {
-		return false;
+		return true;
 	}
 }
