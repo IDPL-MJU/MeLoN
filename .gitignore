@@ -1,3 +1,5 @@
 /MeLoN/bin/
 /MeLoN/target/
 /MeLoN/.settings/
+#Package Files #
+*.jar

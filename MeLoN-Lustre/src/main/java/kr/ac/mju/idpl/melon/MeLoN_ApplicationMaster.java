@@ -111,7 +111,7 @@ public class MeLoN_ApplicationMaster {
 	private List<Thread> launchTreads = new ArrayList<Thread>();
 	private Options opts;
 
-	private String[] nodes = new String[] { "master", "slave1", "slave2" };
+	private String[] nodes = new String[] { "master.idpl.org", "slave1.idpl.org", "slave2.idpl.org" };
 	private Map<String, MeLoN_GPUDeviceInfo> nodeGPUInfoMap = new HashMap<>();
 
 	public MeLoN_ApplicationMaster() throws Exception {
@@ -562,8 +562,12 @@ public class MeLoN_ApplicationMaster {
 			containerLaunchEnvs.put(MeLoN_Constants.APP_EXECUTION_TYPE, appExecutionType.name());
 			containerLaunchEnvs.put(MeLoN_Constants.APP_ID, appIdString);
 			containerLaunchEnvs.put(MeLoN_Constants.FILE_SYSTEM_TYPE, fileSystemType.name());
-
-			containerLaunchEnvs.putAll(gpuAssignor.getGPUDeviceEnv(container, task));
+			
+			if(gpuAssignmentType == GPUAssignmentType.EXCLUSIVE) {
+				containerLaunchEnvs.putAll(gpuAssignor.getExclusiveGPUDeviceEnv(container, task));
+			}else {
+				containerLaunchEnvs.putAll(gpuAssignor.getGPUDeviceEnv(container, task));
+			}
 
 			// Add job type specific resources
 			Map<String, LocalResource> containerResources = new ConcurrentHashMap<>(localResources);

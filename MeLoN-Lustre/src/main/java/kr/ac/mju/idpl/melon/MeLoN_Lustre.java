@@ -10,17 +10,11 @@ import kr.ac.mju.idpl.melon.util.Utils;
 public class MeLoN_Lustre {
 	private static final Logger LOG = LoggerFactory.getLogger(MeLoN_Lustre.class);
 
-	public static void copyToLustre(String appId) {
+	public static void mkdironLustre(String appId) {
 		String appIdDir = MeLoN_Constants.LUSTRE_FILESYSTEM_URI + File.separator + appId;
 		String[] mkdirAppId = { "mkdir", appIdDir };
-		//String[] copyVenv = { "cp", MeLoN_Constants.PYTHON_VENV_ZIP, appIdDir };
-		//String[] copySrc = { "cp", MeLoN_Constants.MELON_SRC_ZIP_NAME, appIdDir };
 		LOG.info("Make Directory in Lustre");
 		lustreCommand(mkdirAppId);
-		/*LOG.info("Copy Venv.zip to Lustre");
-		lustreCommand(copyVenv);
-		LOG.info("Copy src.zip to Lustre");
-		lustreCommand(copySrc);*/
 	}
 
 	public static void lustreCommand(String[] cmd) {

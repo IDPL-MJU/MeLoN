@@ -65,7 +65,7 @@ public class MeLoN_GPUAssignor {
 			ParserConfigurationException, NumberFormatException, XPathExpressionException {
 		for (String host : nodes) {
 			ProcessBuilder monitoringProcessBuilder = new ProcessBuilder("/bin/bash", "-c", 
-					"ssh hduser@" + host + " nvidia-smi -q -x");
+					"sshpass -phadoop ssh -o StrictHostKeyChecking=no hduser@" + host + " nvidia-smi -q -x");
 			Process monitoringProcess = monitoringProcessBuilder.start();
 			//monitoringProcess.waitFor();
 			BufferedReader br = new BufferedReader(new InputStreamReader(monitoringProcess.getInputStream()));
@@ -179,7 +179,6 @@ public class MeLoN_GPUAssignor {
 	
 	public synchronized Map<String, String> getGPUDeviceEnv(Container container, MeLoN_Task task) {
 		LOG.info("Container {} getGPUDeviceEnv. task is {}", container.getId(), task.getJobName());
-		LOG.info("GPURequest : " + gpuRequests.toString());
 		Map<String, String> env = new ConcurrentHashMap<>();
 		for (MeLoN_GPURequest gpuReq : gpuRequests) {
 			if (gpuReq.getJobName().equals(task.getJobName()) && gpuReq.getDevice() != null
@@ -198,6 +197,53 @@ public class MeLoN_GPUAssignor {
 				gpuReq.setContainerId(container.getId());
 			}
 		}
+		return env;
+	}
+	
+	public synchronized Map<String, String> getExclusiveGPUDeviceEnv(Container container, MeLoN_Task task) {
+		LOG.info("Container {} getGPUDeviceEnv. task is {}", container.getId(), task.getJobName());
+		Map<String, String> env = new ConcurrentHashMap<>();
+		LOG.info("Container node address : " + container.getNodeHttpAddress());
+		String containerAddress = container.getNodeHttpAddress().split(":")[0];
+		Map<Integer, MeLoN_GPUDeviceInfo> devices = new HashMap<>();
+		for (String deviceKey : gpuDevicesInfo.keySet()) {
+			MeLoN_GPUDeviceInfo device = gpuDevicesInfo.get(deviceKey);
+			if (device.getDeviceHost().equals(containerAddress)) {
+				devices.put(device.getDeviceNum(), device);
+			}
+		}
+		if (devices.get(0).getComputeProcessCount() == devices.get(1).getComputeProcessCount()) {
+			if (devices.get(0).getFree() >= devices.get(1).getFree()) {
+				env.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, "0");
+				devices.get(0).increaseComputeProcessCount();
+			} else {
+				env.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, "1");
+				devices.get(1).increaseComputeProcessCount();
+			}
+		} else if (devices.get(0).getComputeProcessCount() < devices.get(1).getComputeProcessCount()) {
+			env.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, "0");
+			devices.get(0).increaseComputeProcessCount();
+		} else {
+			env.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, "1");
+			devices.get(1).increaseComputeProcessCount();
+		}
+		/*for (MeLoN_GPURequest gpuReq : gpuRequests) {
+			if (gpuReq.getJobName().equals(task.getJobName()) && gpuReq.getDevice() != null
+					&& gpuReq.getDevice().getDeviceHost().equals(container.getNodeId().getHost())
+					&& gpuReq.isRequested()) {
+				gpuReq.setStatusAllocated();
+				gpuReq.setContainerId(container.getId());
+				env.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, String.valueOf(gpuReq.getDevice().getDeviceNum()));
+				env.put(MeLoN_Constants.FRACTION, gpuReq.getFraction());
+				LOG.info("Extra envs set. Task = " + task.getJobName() + ":" + task.getTaskIndex()
+						+ " Device = " + gpuReq.getDevice().getDeviceId() + ", Using "
+						+ gpuReq.getGPUMemory() + "/" + gpuReq.getDevice().getTotal() + "MB, Fraction = "
+						+ gpuReq.getFraction() + " ContainerId = " + container.getId());
+				break;
+			}else if(gpuReq.getJobName().equals(task.getJobName()) && gpuReq.getDevice() == null) {
+				gpuReq.setContainerId(container.getId());
+			}
+		}*/
 		return env;
 	}
 	

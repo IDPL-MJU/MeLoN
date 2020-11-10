@@ -477,11 +477,7 @@ public class MeLoN_Client {
 						MeLoN_ConfigurationKeys.CONTAINER_RESOURCES, melonConf);
 			}
 		} else if (fileSystemType == FileSystemType.LUSTRE) {
-			/*if (!Utils.isArchive(srcDir)) {
-				LOG.info("Zipping the src directory to upload ...");
-				zipFolder(Paths.get(srcDir), Paths.get(MeLoN_Constants.MELON_SRC_ZIP_NAME));
-			}*/
-			MeLoN_Lustre.copyToLustre(appId.toString());
+			MeLoN_Lustre.mkdironLustre(appId.toString());
 		}
 		
 		// upload site configuration files(core-site.xml, yarn-site.xml, hdfs-site.xml) to HDFS

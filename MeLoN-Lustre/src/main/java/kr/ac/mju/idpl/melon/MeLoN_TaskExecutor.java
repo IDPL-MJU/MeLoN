@@ -213,31 +213,6 @@ public class MeLoN_TaskExecutor {
 		Utils.initHdfsConf(hdfsConf);
 	}
 
-	//Lustre
-	private String buildTaskCommand(String command, String appId) {
-		String TaskCommand = null;
-		if (fileSystemType.toString().equals("LUSTRE")) {
-			LOG.info("File_System_type is " + fileSystemType.toString());
-			String lustreUrl = MeLoN_Constants.LUSTRE_FILESYSTEM_URI + File.separator + appId + File.separator;
-			String[] tmpCommand = command.split(" ");
-			TaskCommand = lustreUrl + tmpCommand[0] + " " + lustreUrl + "src" + File.separator + tmpCommand[1];
-			if (tmpCommand.length >= 3) {
-				for(int i=2;i<tmpCommand.length;i++) {
-					TaskCommand += " " + tmpCommand[i];
-				}
-			}
-		} else if (fileSystemType.toString().equals("HDFS")) {
-			TaskCommand = command;
-		}
-		if (TaskCommand.isEmpty()) {
-			LOG.info("Failed to build TaskCommand");
-			return null;
-		}else {
-			LOG.info("Established Task Command " + command + " change to " + TaskCommand);
-			return TaskCommand;
-		}
-	}
-
 	private void releasePorts() throws IOException {
 		if (this.rpcSocket != null) {
 			this.rpcSocket.close();
