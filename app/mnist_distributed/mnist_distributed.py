@@ -208,9 +208,11 @@ def main(_):
     worker_hosts = cluster_spec['worker']
 
     # Create a cluster from the parameter server and worker hosts.
+    # 사용할 parameter server와 worker 정의
     cluster = tf.train.ClusterSpec({"ps": ps_hosts, "worker": worker_hosts})
 
     # Create and start a server for the local task.
+    # job_name은 ps나 worker 둘 중 하나
     job_name = os.environ["JOB_NAME"]
     task_index = int(os.environ["TASK_INDEX"])
     server_config = None
@@ -224,8 +226,10 @@ def main(_):
         job_name=job_name, 
         task_index=task_index)
 
+    # ps는 연산 그래프 작성하지 않음, 계산이 수행되는 동안 종료되지 않도록 함
     if job_name == "ps":
         server.join()
+    # worker면 task index마다 별개의 replica device에서 모델 생성
     elif job_name == "worker":
         # Create our model graph. Assigns ops to the local worker by default.
         with tf.device(tf.train.replica_device_setter(
@@ -235,6 +239,7 @@ def main(_):
             merged = create_model()
 
         logging.info('=========================in main4')
+        # task_index가 0이면 chief worker, workding dir을 만듦
         if task_index is 0:  # chief worker
             os.system('hdfs dfs -mkdir /tmp/melon')
             os.system('hdfs dfs -mkdir /tmp/melon/'+os.environ["APP_ID"])
@@ -248,6 +253,9 @@ def main(_):
 
         # The StopAtStepHook handles stopping after running given steps.
         logging.info('=========================in main before hooks')
+        # 특정 스텝이 지나면 training을 멈추게 하는 역할, parameter로 가능한 것은 last_step, num_steps
+        # last_steps : worker 모두 합쳐 step만큼 진행하고 종료
+        # num_steps : worker가 실행하고 나서부터 step만큼 지나야 종료 (chief는 스텝에 딱 맞춰 끝나지만 나머지는 늦게 실행되어 스텝 초과)
         hooks = [tf.train.StopAtStepHook(num_steps=FLAGS.steps)]
         logging.info('=========================in main3==='+getpass.getuser())
 
@@ -261,6 +269,7 @@ def main(_):
         #config_proto.gpu_options.per_process_gpu_memory_fraction = fraction
         #config_proto.gpu_options.allow_growth = True
 
+        # 분산된 장치에서 학습을 용이하게 해주는 모니터 세션, hook을 통해 학습을 종료, 에러 발생시 세션 복원, 변수 초기화 등 담당
         with tf.train.MonitoredTrainingSession(master=server.target,
                                                is_chief=(task_index == 0),
                                                #checkpoint_dir=FLAGS.working_dir,
@@ -277,9 +286,13 @@ def main(_):
 
             # Train
             logging.info('Starting training')
+            # local step
             i = 0
+            # hook에서 설정한 종료 조건 달성 전까지 반복
             while not sess.should_stop():
+                # next_batch의 parameter인 shuffle=False 설정 시 worker들은 순서대로 같은 데이터 학습, default는 True
                 batch = mnist.train.next_batch(FLAGS.batch_size)
+                # 1000번 째 스텝마다 로그를 찍음, step은 global step 의미
                 if i % 1000 == 0:
                     step, _, train_accuracy = sess.run(
                         [global_step, train_step, accuracy],
