@@ -67,7 +67,6 @@ public class MeLoN_GPUAssignor {
 			ProcessBuilder monitoringProcessBuilder = new ProcessBuilder("/bin/bash", "-c", 
 					"sshpass -phadoop ssh -o StrictHostKeyChecking=no hduser@" + host + " nvidia-smi -q -x");
 			Process monitoringProcess = monitoringProcessBuilder.start();
-			//monitoringProcess.waitFor();
 			BufferedReader br = new BufferedReader(new InputStreamReader(monitoringProcess.getInputStream()));
 
 			String result = "";
@@ -79,13 +78,12 @@ public class MeLoN_GPUAssignor {
 				}
 			}
 			monitoringProcess.waitFor();
-			//LOG.info("nvidia-smi : " + result);
 			InputSource is = new InputSource(new StringReader(result));
 			Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(is);
 			XPath xPath = XPathFactory.newInstance().newXPath();
 			String expression = "/nvidia_smi_log/attached_gpus";
 			int gpuNum = Integer.parseInt(xPath.compile(expression).evaluate(doc));
-			//LOG.info("gpuNum : " + gpuNum);
+
 			for (int i = 1; i <= gpuNum; i++) {
 				expression = "/nvidia_smi_log/gpu[" + i + "]/minor_number";
 				int deviceNum = Integer.parseInt(xPath.compile(expression).evaluate(doc));
@@ -227,23 +225,6 @@ public class MeLoN_GPUAssignor {
 			env.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, "1");
 			devices.get(1).increaseComputeProcessCount();
 		}
-		/*for (MeLoN_GPURequest gpuReq : gpuRequests) {
-			if (gpuReq.getJobName().equals(task.getJobName()) && gpuReq.getDevice() != null
-					&& gpuReq.getDevice().getDeviceHost().equals(container.getNodeId().getHost())
-					&& gpuReq.isRequested()) {
-				gpuReq.setStatusAllocated();
-				gpuReq.setContainerId(container.getId());
-				env.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, String.valueOf(gpuReq.getDevice().getDeviceNum()));
-				env.put(MeLoN_Constants.FRACTION, gpuReq.getFraction());
-				LOG.info("Extra envs set. Task = " + task.getJobName() + ":" + task.getTaskIndex()
-						+ " Device = " + gpuReq.getDevice().getDeviceId() + ", Using "
-						+ gpuReq.getGPUMemory() + "/" + gpuReq.getDevice().getTotal() + "MB, Fraction = "
-						+ gpuReq.getFraction() + " ContainerId = " + container.getId());
-				break;
-			}else if(gpuReq.getJobName().equals(task.getJobName()) && gpuReq.getDevice() == null) {
-				gpuReq.setContainerId(container.getId());
-			}
-		}*/
 		return env;
 	}
 	

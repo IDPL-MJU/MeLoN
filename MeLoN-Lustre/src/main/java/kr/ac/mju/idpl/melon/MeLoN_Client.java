@@ -88,7 +88,7 @@ public class MeLoN_Client {
 	private String executes = null;
 	private String srcDir = null;
 	private String melonJarPath = null;
-	private String lustrepath = null;
+	private String lustrePath = null;
 	private Configuration melonConf;
 	private String melonFinalConfPath;
 	private Map<String, String> shellEnvs = new HashMap<>();
@@ -158,14 +158,13 @@ public class MeLoN_Client {
 		fileSystemType = FileSystemType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE, 
 				MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE_DEFAULT));
 		if(fileSystemType == FileSystemType.LUSTRE) {
-			lustrepath = cliParser.getOptionValue("lustre_path", "/mnt/lustre/melon");
+			lustrePath = cliParser.getOptionValue("lustre_path", "/mnt/lustre/melon");
 		}
-		executes = buildTaskCommand(pythonVenv, pythonBinaryPath, cliParser.getOptionValue("executes"), taskParams, lustrepath);
+		executes = buildTaskCommand(pythonVenv, pythonBinaryPath, cliParser.getOptionValue("executes"), taskParams, lustrePath);
 		appExecutionType = AppExecutionType.valueOf(
 				melonConf.get(MeLoN_ConfigurationKeys.EXECUTION_TYPE, MeLoN_ConfigurationKeys.EXECUTION_TYPE_DEFAULT));
 		gpuAssignmentType = GPUAssignmentType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.GPU_ASSIGNMENT_TYPE,
 				MeLoN_ConfigurationKeys.GPU_ASSIGNMENT_TYPE_DEFAULT));
-		
 
 		melonConf.set(MeLoN_ConfigurationKeys.CONTAINERS_COMMAND, executes);
 
@@ -280,7 +279,7 @@ public class MeLoN_Client {
 		LOG.info("Finished initializing YARN configurations...");
 	}
 
-	public String buildTaskCommand(String pythonVenv, String pythonBinaryPath, String executes, String taskParams, String lustrepath) {
+	public String buildTaskCommand(String pythonVenv, String pythonBinaryPath, String executes, String taskParams, String lustrePath) {
 		LOG.info("Building a container task command.");
 		if (executes != null) {
 			String containerCmd = executes;
@@ -294,11 +293,11 @@ public class MeLoN_Client {
 					}
 					containerCmd = pythonInterpreter + " " + executes;
 				} else if (fileSystemType == FileSystemType.LUSTRE) {
-					String lustreExecutes = lustrepath + File.separator + MeLoN_Constants.SRC_DIR + File.separator + executes;
+					String lustreExecutes = lustrePath + File.separator + MeLoN_Constants.SRC_DIR + File.separator + executes;
 					if (pythonBinaryPath.startsWith("/")) {
-						pythonInterpreter = lustrepath + File.separator + MeLoN_Constants.PYTHON_VENV_DIR + pythonBinaryPath;						
+						pythonInterpreter = lustrePath + File.separator + MeLoN_Constants.PYTHON_VENV_DIR + pythonBinaryPath;						
 					} else {
-						pythonInterpreter = lustrepath + File.separator + MeLoN_Constants.PYTHON_VENV_DIR + File.separator + pythonBinaryPath;
+						pythonInterpreter = lustrePath + File.separator + MeLoN_Constants.PYTHON_VENV_DIR + File.separator + pythonBinaryPath;
 					}
 					containerCmd = pythonInterpreter + " " + lustreExecutes;
 				}
@@ -379,7 +378,6 @@ public class MeLoN_Client {
 		}
 		LOG.info("***melonFinalConf : " + melonConf.getValByRegex("melon\\.([a-z]+)\\.([a-z]+)"));
 		ApplicationReport report = yarnClient.getApplicationReport(appId);
-		// return monitorApplication();
 		return 0;
 	}
 
@@ -606,43 +604,6 @@ public class MeLoN_Client {
 		});
 		zos.close();
 	}
-
-//	private int monitorApplication() throws YarnException, IOException {
-//		while (true) {
-//			try {
-//				Thread.sleep(30000);
-//			} catch (InterruptedException e) {
-//
-//			}
-//
-//			ApplicationReport report = yarnClient.getApplicationReport(appId);
-//
-//			LOG.info("Got applicaion report from ASM for appId=" + appId.getId() + ", clientToAMToken="
-//					+ report.getClientToAMToken() + ", appDiagnotics=" + report.getDiagnostics() + ", appMasterHost="
-//					+ report.getHost() + ", appQueue=" + report.getQueue() + ", appMasterRpcPort=" + report.getRpcPort()
-//					+ ", appStartTime=" + report.getStartTime() + ", yarnAppState="
-//					+ report.getYarnApplicationState().toString() + ", distributedFinalState="
-//					+ report.getFinalApplicationStatus() + ", appTrackingUrl=" + report.getTrackingUrl() + ", appUser= "
-//					+ report.getUser());
-//
-//			YarnApplicationState appState = report.getYarnApplicationState();
-//			FinalApplicationStatus finalApplicationStatus = report.getFinalApplicationStatus();
-//			if (YarnApplicationState.FINISHED == appState) {
-//				if (FinalApplicationStatus.SUCCEEDED == finalApplicationStatus) {
-//					LOG.info("Application has completed successfully. Breaking monitoring loop.");
-//					return 0;
-//				} else {
-//					LOG.info("Application finished unsuccessfully." + "YarnState=" + appState.toString()
-//							+ ", FinalStatus=" + finalApplicationStatus.toString() + ". Breaking monitoring loop.");
-//					return -1;
-//				}
-//			} else if (YarnApplicationState.KILLED == appState || YarnApplicationState.FAILED == appState) {
-//				LOG.info("Application did not finish." + "YarnState=" + appState.toString() + "FinalStatus="
-//						+ finalApplicationStatus.toString() + ". Breaking monitoring loop");
-//				return -1;
-//			}
-//		}
-//	}
 
 	public void printUsage() {
 		new HelpFormatter().printHelp("MeLoN_Client", opts);

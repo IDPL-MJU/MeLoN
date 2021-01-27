@@ -28,22 +28,4 @@ public class MeLoN_Lustre {
 			LOG.info("Failed to execute command");
 		}
 	}
-
-	public static void extractVenvandSrc(String dst) {
-		File venvZip = new File(dst + File.separator + MeLoN_Constants.PYTHON_VENV_ZIP);
-		File srcZip = new File(dst + File.separator + MeLoN_Constants.MELON_SRC_ZIP_NAME);
-		if (venvZip.exists()) {
-			LOG.info("Unpacking Python virtual environment..");
-			Utils.unzipArchive(dst + File.separator + MeLoN_Constants.PYTHON_VENV_ZIP, dst + File.separator);
-		} else {
-			LOG.info("No virtual environment uploaded.");
-		}
-		if (srcZip.exists()) {
-			LOG.info("Unpacking src Folder..");
-			Utils.unzipArchive(dst + File.separator + MeLoN_Constants.MELON_SRC_ZIP_NAME,
-					dst + File.separator + MeLoN_Constants.SRC_DIR + File.separator);
-		} else {
-			LOG.info("No src folder uploaded.");
-		}
-	}
 }

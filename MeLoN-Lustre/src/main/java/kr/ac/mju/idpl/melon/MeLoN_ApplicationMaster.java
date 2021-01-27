@@ -74,8 +74,6 @@ public class MeLoN_ApplicationMaster {
 	private int amPort = 0;
 	private String amTrackingUrl = "";
 
-	private int numTotalContainers;
-
 	private Map<String, List<ContainerRequest>> askedContainerMap = new HashMap<>();
 	private Map<Integer, List<Container>> sessionContainersMap = new ConcurrentHashMap<>();
 	private AppExecutionResult appExecutionResult = new AppExecutionResult();
@@ -97,9 +95,6 @@ public class MeLoN_ApplicationMaster {
 	private AtomicInteger numRequestedContainers = new AtomicInteger();
 
 	private Map<String, String> containerEnvs = new HashMap<>();
-	// private String melonHome;
-	// private String appJar;
-	// private String domainController;
 
 	private MeLoN_Session session;
 	private MeLoN_Session.Builder sessionBuilder;
@@ -108,7 +103,6 @@ public class MeLoN_ApplicationMaster {
 
 	private volatile boolean done;
 
-	private List<Thread> launchTreads = new ArrayList<Thread>();
 	private Options opts;
 
 	private String[] nodes = new String[] { "master.idpl.org", "slave1.idpl.org", "slave2.idpl.org" };
@@ -118,10 +112,6 @@ public class MeLoN_ApplicationMaster {
 		yarnConf = new Configuration(false);
 		hdfsConf = new Configuration(false);
 		opts = new Options();
-		initOptions();
-	}
-
-	private void initOptions() {
 	}
 
 	private boolean init(String[] args) {
@@ -147,14 +137,9 @@ public class MeLoN_ApplicationMaster {
 		containerEnvs = Utils.parseKeyValue(containersEnvsStr);
 		containerId = ContainerId.fromString(envs.get(ApplicationConstants.Environment.CONTAINER_ID.name()));
 		appIdString = containerId.getApplicationAttemptId().getApplicationId().toString();
-//		hdfsClasspath = cliParser.getOptionValue("hdfs_classpath");
 		appExecutionType = AppExecutionType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.EXECUTION_TYPE));
 		gpuAssignmentType = GPUAssignmentType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.GPU_ASSIGNMENT_TYPE));
 		fileSystemType = FileSystemType.valueOf(melonConf.get(MeLoN_ConfigurationKeys.FILE_SYSTEM_TYPE));
-		
-		/*if(fileSystemType == FileSystemType.LUSTRE) {
-			MeLoN_Lustre.extractVenvandSrc(MeLoN_Constants.LUSTRE_FILESYSTEM_URI + File.separator + appIdString);
-		}*/
 
 		return true;
 	}
@@ -186,7 +171,6 @@ public class MeLoN_ApplicationMaster {
 		containerEnvs.put(MeLoN_Constants.AM_HOST, amHostname);
 		containerEnvs.put(MeLoN_Constants.AM_PORT, Integer.toString(amPort));
 
-//		String amIPPort = NetUtils.getLocalInetAddress(amHostname).getHostAddress() + ":" + amPort;
 		RegisterApplicationMasterResponse response = amRMClient.registerApplicationMaster(amHostname, amPort,
 				amTrackingUrl);
 		LOG.info("MeLoN_ApplicationMaster is registered with response : {}", response.toString());
@@ -387,26 +371,6 @@ public class MeLoN_ApplicationMaster {
 		}
 	}
 
-//	public synchronized Map<String, String> getGPUDeviceEnv(Container container, MeLoN_Task task) {
-//		Map<String, String> env = new ConcurrentHashMap<>();
-//		for (GPURequest gpuReq : gpuAllocator.getGPUDeviceallocInfo()) {
-//			if (gpuReq.getRequestTask().equals(task.getJobName()) && gpuReq.getDevice() != null
-//					&& gpuReq.getDevice().getDeviceHost().equals(container.getNodeId().getHost())
-//					&& gpuReq.isRequested()) {
-//				gpuReq.setStatusAllocated();
-//				gpuReq.setContainerId(container.getId());
-//				env.put(MeLoN_Constants.CUDA_VISIBLE_DEVICES, String.valueOf(gpuReq.getDevice().getDeviceNum()));
-//				env.put(MeLoN_Constants.FRACTION, gpuReq.getFraction());
-//				LOG.info("\n***Extra envs set." + "\n***Task = " + task.getJobName() + ":" + task.getTaskIndex()
-//						+ "\n***Device = " + gpuReq.getDevice().getDeviceId() + ", Using "
-//						+ gpuReq.getRequiredGPUMemory() + "/" + gpuReq.getDevice().getTotal() + "MB, Fraction = "
-//						+ gpuReq.getFraction() + "\n***ContainerId = " + container.getId());
-//				break;
-//			}
-//		}
-//		return env;
-//	}
-
 	private class NMCallbackHandler implements NMClientAsync.CallbackHandler {
 
 		@Override
@@ -536,7 +500,6 @@ public class MeLoN_ApplicationMaster {
 
 	private class ContainerLauncher implements Runnable {
 		Container container;
-		// NMCallbackHandler containerListener;
 
 		public ContainerLauncher(Container container) {
 			this.container = container;
@@ -556,8 +519,6 @@ public class MeLoN_ApplicationMaster {
 			containerLaunchEnvs.put(MeLoN_Constants.JOB_NAME, jobName);
 			containerLaunchEnvs.put(MeLoN_Constants.TASK_INDEX, taskIndex);
 			containerLaunchEnvs.put(MeLoN_Constants.TASK_NUM, String.valueOf(session.getTotalTrackedTasks()));
-			// containerLaunchEnvs.put(MeLoN_Constants.SESSION_ID,
-			// String.valueOf(appSession.sessionId));
 
 			containerLaunchEnvs.put(MeLoN_Constants.APP_EXECUTION_TYPE, appExecutionType.name());
 			containerLaunchEnvs.put(MeLoN_Constants.APP_ID, appIdString);

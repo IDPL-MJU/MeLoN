@@ -77,9 +77,7 @@ public class MeLoN_TaskExecutor {
 		initConfigs();
 		if (fileSystemType == FileSystemType.HDFS) {
 			Utils.extractResources();
-		}/* else if (fileSystemType == FileSystemType.LUSTRE) {
-			MeLoN_Lustre.extractVenvandSrc(MeLoN_Constants.LUSTRE_FILESYSTEM_URI + File.separator + appIdString);
-		}*/
+		}
 
 		LOG.info("This container's jobName is {}", jobName);
 		InetSocketAddress addr = new InetSocketAddress(amHost, amPort);
@@ -142,9 +140,7 @@ public class MeLoN_TaskExecutor {
 	private void registerExecutionResult() throws Exception {
 		String response;
 		int attempt = 60;
-//		ExecutorExecutionResult result = new ExecutorExecutionResult(exitCode, host, device, fraction, jobName, taskIndex, executorExecutionTime, processExecutionTime);
 		while (attempt > 0) {
-//			response = amClient.registerExecutionResult(result);
 			response = amClient.registerExecutionResult(exitCode, host, device, fraction, jobName, taskIndex, executorExecutionTime, processExecutionTime);
 			if (response != null) {
 				LOG.info("AM response for result execution run: " + response);
@@ -165,7 +161,6 @@ public class MeLoN_TaskExecutor {
 			}
 		}
 
-		//taskCommand += "; rm -r ./*";
 		LOG.info("Executing command: " + taskCommand);
 		ProcessBuilder taskProcessBuilder = new ProcessBuilder("bash", "-c", taskCommand);
 		taskProcessBuilder.redirectError(ProcessBuilder.Redirect.INHERIT);
@@ -204,9 +199,7 @@ public class MeLoN_TaskExecutor {
 		if (taskCommand == null) {
 			LOG.error("Task command is empty. Please see task command in configuration files.");
 			throw new IllegalArgumentException();
-		}/*else {
-			taskCommand = buildTaskCommand(taskCommand, appIdString);
-		}*/
+		}
 		LOG.info("Task command: " + taskCommand);
 
 		Utils.initYarnConf(yarnConf);
