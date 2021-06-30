@@ -14,7 +14,7 @@ The adaptive resource management scheme mainly consists of 8 Java classes (https
 * UpdateResourceLimit.java: a function class that runs inside ModifyCPULimit & ModifyMemLimit classes to reflect the container resource (CPU, memory) limit values to the actual container
 
 ### Prerequisites
-We are utilizing Docker (https://www.docker.com/get-started) as a container management platform, and Google's cAdvisor (https://github.com/google/cadvisor) for monitoring resource usage patterns (e.g., CPU, Memory) of running Docker containers. For the installation and configuration of Docker and cAdvisor you can refer to the following web sites.
+We are utilizing Docker (https://www.docker.com/get-started) as a container management platform, and Google's cAdvisor (https://github.com/google/cadvisor) for monitoring resource usage patterns (e.g., CPU, Memory) of running Docker containers. For the installation and configuration of Docker and cAdvisor, you can refer to the following web sites.
 
 * Docker: https://docs.docker.com/
 * cAdvisor: https://github.com/google/cadvisor/
@@ -28,3 +28,11 @@ java com.idpl.mju.autoelastic.AutoElastic
 ```
 
 Then, the AutoElastic class periodically adjusts CPU and Memory limits of running containers if necessary, based on the monitored resource usages and fine-grained resource coordination policies. 
+
+The Docker containers that have been used in our big data workloads experiments are also maintained through the Docker Hub (https://hub.docker.com/). We used the Intel's HiBench Suite (https://github.com/Intel-bigdata/HiBench) which is a representative big data benchmark suite that helps us to evaluate different big data frameworks in terms of speed, throughput and system resource utilizations. Therefore, we have maintained Docker images that have already installed Apache Hadoop (https://hadoop.apache.org/) and Apache Spark (https://spark.apache.org/) along with the HiBench Suite as followings.
+
+* https://hub.docker.com/r/cjy2181/hadoop-hibench
+* https://hub.docker.com/r/cjy2181/hibench_base
+
+
+
