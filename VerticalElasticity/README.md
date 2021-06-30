@@ -29,10 +29,17 @@ java com.idpl.mju.autoelastic.AutoElastic
 
 Then, the AutoElastic class periodically adjusts CPU and Memory limits of running containers if necessary, based on the monitored resource usages and fine-grained resource coordination policies. 
 
-The Docker containers that have been used in our big data workloads experiments are also maintained through the Docker Hub (https://hub.docker.com/). We used the Intel's HiBench Suite (https://github.com/Intel-bigdata/HiBench) which is a representative big data benchmark suite that helps us to evaluate different big data frameworks in terms of speed, throughput and system resource utilizations. Therefore, we have maintained Docker images that have already installed Apache Hadoop (https://hadoop.apache.org/) and Apache Spark (https://spark.apache.org/) along with the HiBench Suite as followings.
+The Docker containers that have been used in our big data workloads experiments are also maintained through the Docker Hub (https://hub.docker.com/). We used the Intel's HiBench Suite (https://github.com/Intel-bigdata/HiBench) which is a representative big data benchmark suite that helps us to evaluate different big data frameworks in terms of speed, throughput and system resource utilizations. Therefore, we have maintained a Docker image that has already installed Apache Hadoop (https://hadoop.apache.org/) and Apache Spark (https://spark.apache.org/) along with the HiBench Suite as followings.
 
 * https://hub.docker.com/r/cjy2181/hadoop-hibench
-* https://hub.docker.com/r/cjy2181/hibench_base
 
+Once you pull the Docker image from Docker Hub and run the container, please execute the following steps before running the benchmarks in order to prepare the Hadoop & Spark platforms.
+
+1. service ssh start
+2. $HADOOP_HOME/bin/hadoop namenode -format
+3. $HADOOP_HOME/sbin/start-all.sh
+4. $SPARK_HOME/sbin/start-all.sh
+
+Then, we can run big data benchmarks inside the container either by using the Hadoop (https://github.com/Intel-bigdata/HiBench/blob/master/docs/run-hadoopbench.md) or Spark (https://github.com/Intel-bigdata/HiBench/blob/master/docs/run-sparkbench.md).
 
 
