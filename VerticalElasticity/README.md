@@ -3,7 +3,7 @@
 ## This is a source code repository for Adaptive Resource Management Scheme in Container-based Cloud Environments
 Our adaptive resource management scheme can periodically monitor the resource usage patterns of running containers and dynamically adjust (scale up/down) allocated computing resources by leveraging the vertical elasticity of Docker. The vertical elasticity means that we can dynamically increase or decrease computing resource allocations (e.g., CPU time, cores, memory, and network bandwidth) of a running container. The Adaptive Resource Controller periodically adjusts CPU and Memory limits of running containers if necessary, based on the monitored resource usages and fine-grained resource coordination policies that can reflect the characteristics of big data workloads. 
 
-The adaptive resource management scheme mainly consists of 8 Java classes as followings:
+The adaptive resource management scheme mainly consists of 8 Java classes (https://github.com/IDPL-MJU/MeLoN/tree/master/VerticalElasticity/src/main/java/com/idpl/mju/autoelastic) as followings:
 * AutoElastic.java: a main class that periodically allocates/reclaims computing resources to running containers
 * GetDockerList.java: getting a list of currently running docker containers
 * GetDockerResourceData.java: getting the CPU and memory limits of Docker containers and calculating the current resource usages(%)
