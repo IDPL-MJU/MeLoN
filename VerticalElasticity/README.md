@@ -19,5 +19,12 @@ We are utilizing Docker (https://www.docker.com/get-started) as a container mana
 * Docker: https://docs.docker.com/
 * cAdvisor: https://github.com/google/cadvisor/
 
-### Installation
+### Building & Testing
+This project can be basically built through Maven (https://maven.apache.org/) and eclipse IDE (https://www.eclipse.org/).
+Once building is completed, we can simply run the Adaptive Resource Controller using the java command in the host server where Docker containers are running.
 
+```
+java com.idpl.mju.autoelastic.AutoElastic
+```
+
+Then, the AutoElastic class periodically adjusts CPU and Memory limits of running containers if necessary, based on the monitored resource usages and fine-grained resource coordination policies. 
